@@ -27,6 +27,7 @@ import java.nio.file.Paths;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Date;
+import java.util.stream.Collectors;
 
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
@@ -242,8 +243,9 @@ public class IndexFiles implements AutoCloseable {
             // so that the text of the file is tokenized and indexed, but not stored.
             // Note that FileReader expects the file to be in UTF-8 encoding.
             // If that's not the case searching for special characters will fail.
-            doc.add(new TextField("contents",
-                    new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8))));
+            String content = new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8))
+                    .lines().collect(Collectors.joining("\n"));
+            doc.add(new TextField("contents", content, Field.Store.YES));
 
             if (demoEmbeddings != null) {
                 try (InputStream in = Files.newInputStream(file)) {
