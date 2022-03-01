@@ -1,0 +1,11 @@
+org.apache.lucene.codecs.asserting
+org.apache.lucene.codecs.blockterms
+org.apache.lucene.codecs.bloom
+org.apache.lucene.codecs.cheapbastard
+org.apache.lucene.codecs.compressing.dummy
+org.apache.lucene.codecs.cranky
+org.apache.lucene.codecs.mockrandom
+org.apache.lucene.codecs.ramonly
+org.apache.lucene.codecs.uniformsplit
+org.apache.lucene.codecs.uniformsplit.sharedterms
+org.apache.lucene.mockfile

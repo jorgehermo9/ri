@@ -1,0 +1,230 @@
+<html>
+<head>
+<title>Apache Lucene Migration Guide</title>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+</head>
+<body>
+<!--
+    Licensed to the Apache Software Foundation (ASF) under one or more
+    contributor license agreements.  See the NOTICE file distributed with
+    this work for additional information regarding copyright ownership.
+    The ASF licenses this file to You under the Apache License, Version 2.0
+    the "License"); you may not use this file except in compliance with
+    the License.  You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+ -->
+<h1 id="apache-lucene-migration-guide">Apache Lucene Migration Guide</h1>
+<h2 id="rename-of-binary-artifacts-from--analyzers--to--analysis--lucene-9562">Rename of binary artifacts from '<strong>-analyzers-</strong>' to '<strong>-analysis-</strong>' (<a href="https://issues.apache.org/jira/browse/LUCENE-9562">LUCENE-9562</a>)</h2>
+<p>All binary analysis packages (and corresponding Maven artifacts) have been renamed and are now consistent with repository module 'analysis'. You will need to adjust build dependencies to the new coordinates:</p>
+<table>
+<thead>
+<tr><th>Old Artifact Coordinates</th><th>New Artifact Coordinates</th></tr>
+</thead>
+<tbody>
+<tr><td>org.apache.lucene:lucene-analyzers-common</td><td>org.apache.lucene:lucene-analysis-common</td></tr>
+<tr><td>org.apache.lucene:lucene-analyzers-icu</td><td>org.apache.lucene:lucene-analysis-icu</td></tr>
+<tr><td>org.apache.lucene:lucene-analyzers-kuromoji</td><td>org.apache.lucene:lucene-analysis-kuromoji</td></tr>
+<tr><td>org.apache.lucene:lucene-analyzers-morfologik</td><td>org.apache.lucene:lucene-analysis-morfologik</td></tr>
+<tr><td>org.apache.lucene:lucene-analyzers-nori</td><td>org.apache.lucene:lucene-analysis-nori</td></tr>
+<tr><td>org.apache.lucene:lucene-analyzers-opennlp</td><td>org.apache.lucene:lucene-analysis-opennlp</td></tr>
+<tr><td>org.apache.lucene:lucene-analyzers-phonetic</td><td>org.apache.lucene:lucene-analysis-phonetic</td></tr>
+<tr><td>org.apache.lucene:lucene-analyzers-smartcn</td><td>org.apache.lucene:lucene-analysis-smartcn</td></tr>
+<tr><td>org.apache.lucene:lucene-analyzers-stempel</td><td>org.apache.lucene:lucene-analysis-stempel</td></tr>
+</tbody>
+</table>
+<h2 id="lucenepackage-class-removed-lucene-10260">LucenePackage class removed (<a href="https://issues.apache.org/jira/browse/LUCENE-10260">LUCENE-10260</a>)</h2>
+<p>LucenePackage class has been removed. The implementation string can be retrieved from Version.getPackageImplementationVersion().</p>
+<h2 id="directory-api-is-now-little-endian-lucene-9047">Directory API is now little endian (<a href="https://issues.apache.org/jira/browse/LUCENE-9047">LUCENE-9047</a>)</h2>
+<p>DataOutput's writeShort, writeInt, and writeLong methods now encode with LE byte order. If you have custom subclasses of DataInput/DataOutput, you will need to adjust them from BE byte order to LE byte order.</p>
+<h2 id="nativeunixdirectory-removed-and-replaced-by-directiodirectory-lucene-8982">NativeUnixDirectory removed and replaced by DirectIODirectory (<a href="https://issues.apache.org/jira/browse/LUCENE-8982">LUCENE-8982</a>)</h2>
+<p>Java 11 supports to use Direct IO without native wrappers from Java code. NativeUnixDirectory in the misc module was therefore removed and replaced by DirectIODirectory. To use it, you need a JVM and operating system that supports Direct IO.</p>
+<h2 id="bm25similaritysetdiscountoverlaps-and-legacybm25similaritysetdiscountoverlaps-methods-removed-lucene-9646">BM25Similarity.setDiscountOverlaps and LegacyBM25Similarity.setDiscountOverlaps methods removed (<a href="https://issues.apache.org/jira/browse/LUCENE-9646">LUCENE-9646</a>)</h2>
+<p>The discount discountOverlaps parameter for both BM25Similarity and LegacyBM25Similarity is now set by the constructor of those classes.</p>
+<h2 id="packages-in-misc-module-are-renamed-lucene-9600">Packages in misc module are renamed (<a href="https://issues.apache.org/jira/browse/LUCENE-9600">LUCENE-9600</a>)</h2>
+<p>Following package names in misc module are renamed.</p>
+<ul>
+<li>o.a.l.document is renamed to o.a.l.misc.document</li>
+<li>o.a.l.index is renamed to o.a.l.misc.index</li>
+<li>o.a.l.search is renamed to o.a.l.misc.search</li>
+<li>o.a.l.store is renamed to o.a.l.misc.store</li>
+<li>o.a.l.util is renamed to o.a.l.misc.util</li>
+</ul>
+<p>Also, o.a.l.document.InetAddressPoint and o.a.l.document.InetAddressRange are moved to core module.</p>
+<h2 id="packages-in-sandbox-module-are-renamed-lucene-9319">Packages in sandbox module are renamed (<a href="https://issues.apache.org/jira/browse/LUCENE-9319">LUCENE-9319</a>)</h2>
+<p>Following package names in sandbox module are renamed.</p>
+<ul>
+<li>o.a.l.codecs is renamed to o.a.l.sandbox.codecs</li>
+<li>o.a.l.document is renamed to o.a.l.sandbox.document</li>
+<li>o.a.l.search is renamed to o.a.l.sandbox.search</li>
+</ul>
+<h2 id="backward-codecs-are-renamed-lucene-9318">Backward codecs are renamed (<a href="https://issues.apache.org/jira/browse/LUCENE-9318">LUCENE-9318</a>)</h2>
+<p>o.a.l.codecs package in <code>lucene-backward-codecs</code> module is renamed to o.a.l.backward_codecs.</p>
+<h2 id="japanesepartofspeechstopfilterfactory-loads-default-stop-tags-if-tags-argument-not-specified-lucene-9567">JapanesePartOfSpeechStopFilterFactory loads default stop tags if &quot;tags&quot; argument not specified (<a href="https://issues.apache.org/jira/browse/LUCENE-9567">LUCENE-9567</a>)</h2>
+<p>Previously, JapanesePartOfSpeechStopFilterFactory added no filter if <code>args</code> didn't include &quot;tags&quot;. Now, it will load the default stop tags returned by <code>JapaneseAnalyzer.getDefaultStopTags()</code> (i.e. the tags from<code>stoptags.txt</code> in the <code>lucene-analyzers-kuromoji</code> jar.)</p>
+<h2 id="icucollationkeyanalyzer-is-renamed-lucene-9558">ICUCollationKeyAnalyzer is renamed (<a href="https://issues.apache.org/jira/browse/LUCENE-9558">LUCENE-9558</a>)</h2>
+<p>o.a.l.collation.ICUCollationAnalyzer is renamed to o.a.l.a.icu.ICUCollationKeyAnalyzer. Also, its dependant classes are renamed in the same way.</p>
+<h2 id="base-and-concrete-analysis-factories-are-moved--package-renamed-lucene-9317">Base and concrete analysis factories are moved / package renamed (<a href="https://issues.apache.org/jira/browse/LUCENE-9317">LUCENE-9317</a>)</h2>
+<ol>
+<li>
+<p>Base analysis factories are moved to <code>lucene-core</code>, also their package names are renamed.</p>
+</li>
+<li>
+<p>o.a.l.a.util.TokenizerFactory (lucene-analysis-common) is moved to o.a.l.a.TokenizerFactory (lucene-core)</p>
+</li>
+<li>o.a.l.a.util.CharFilterFactory (lucene-analysis-common) is moved to o.a.l.a.CharFilterFactory (lucene-core)</li>
+<li>o.a.l.a.util.TokenFilterFactory (lucene-analysis-common) is moved to o.a.l.a.TokenFilterFactory (lucene-core)</li>
+</ol>
+<p>The service provider files placed in <code>META-INF/services</code> for custom analysis factories should be renamed as follows:</p>
+<ul>
+<li>META-INF/services/org.apache.lucene.analysis.TokenizerFactory</li>
+<li>META-INF/services/org.apache.lucene.analysis.CharFilterFactory</li>
+<li>
+<p>META-INF/services/org.apache.lucene.analysis.TokenFilterFactory</p>
+</li>
+<li>
+<p>o.a.l.a.standard.StandardTokenizerFactory is moved to <code>lucene-core</code> module.</p>
+</li>
+<li>
+<p>o.a.l.a.standard package in <code>lucene-analysis-common</code> module is split into o.a.l.a.classic and o.a.l.a.email.</p>
+</li>
+</ul>
+<h2 id="regexpquery-now-rejects-invalid-backslashes-lucene-9370">RegExpQuery now rejects invalid backslashes (<a href="https://issues.apache.org/jira/browse/LUCENE-9370">LUCENE-9370</a>)</h2>
+<p>We now follow the <a href="https://docs.oracle.com/javase/8/docs/api/java/util/regex/Pattern.html#bs">Java rules</a> for accepting backslashes. Alphabetic characters other than s, S, w, W, d or D that are preceded by a backslash are considered illegal syntax and will throw an exception.</p>
+<h2 id="regexp-certain-regular-expressions-now-match-differently-lucene-9336">RegExp certain regular expressions now match differently (<a href="https://issues.apache.org/jira/browse/LUCENE-9336">LUCENE-9336</a>)</h2>
+<p>The commonly used regular expressions \w \W \d \D \s and \S now work the same way <a href="https://docs.oracle.com/javase/tutorial/essential/regex/pre_char_classes.html#CHART">Java Pattern</a> matching works. Previously these expressions were (mis)interpreted as searches for the literal characters w, d, s etc.</p>
+<h2 id="ngramfilterfactory-keepshortterm-option-was-fixed-to-preserveoriginal-lucene-9259">NGramFilterFactory &quot;keepShortTerm&quot; option was fixed to &quot;preserveOriginal&quot; (<a href="https://issues.apache.org/jira/browse/LUCENE-9259">LUCENE-9259</a>)</h2>
+<p>The factory option name to output the original term was corrected in accordance with its Javadoc.</p>
+<h2 id="oalmiscindexmergetool-defaults-changes-lucene-9206">o.a.l.misc.IndexMergeTool defaults changes (<a href="https://issues.apache.org/jira/browse/LUCENE-9206">LUCENE-9206</a>)</h2>
+<p>This command-line tool no longer forceMerges to a single segment. Instead, by default it just follows (configurable) merge policy. If you really want to merge to a single segment, you can pass -max-segments 1.</p>
+<h2 id="oalutilfstbuilder-is-renamed-fstcompiler-with-fluent-style-builder-lucene-9089">o.a.l.util.fst.Builder is renamed FSTCompiler with fluent-style Builder (<a href="https://issues.apache.org/jira/browse/LUCENE-9089">LUCENE-9089</a>)</h2>
+<p>Simply use FSTCompiler instead of the previous Builder. Use either the simple constructor with default settings, or the FSTCompiler.Builder to tune and tweak any parameter.</p>
+<h2 id="kuromoji-user-dictionary-now-forbids-illegal-segmentation-lucene-8933">Kuromoji user dictionary now forbids illegal segmentation (<a href="https://issues.apache.org/jira/browse/LUCENE-8933">LUCENE-8933</a>)</h2>
+<p>User dictionary now strictly validates if the (concatenated) segment is the same as the surface form. This change avoids unexpected runtime exceptions or behaviours. For example, these entries are not allowed at all and an exception is thrown when loading the dictionary file.</p>
+<pre><code># concatenated &quot;日本経済新聞&quot; does not match the surface form &quot;日経新聞&quot;
+日経新聞,日本 経済 新聞,ニホン ケイザイ シンブン,カスタム名詞
+
+# concatenated &quot;日経新聞&quot; does not match the surface form &quot;日本経済新聞&quot;
+日本経済新聞,日経 新聞,ニッケイ シンブン,カスタム名詞
+</code></pre>
+<h2 id="japanesetokenizer-no-longer-emits-original-compound-tokens-by-default-when-the-mode-is-not-normal-lucene-9123">JapaneseTokenizer no longer emits original (compound) tokens by default when the mode is not NORMAL (<a href="https://issues.apache.org/jira/browse/LUCENE-9123">LUCENE-9123</a>)</h2>
+<p>JapaneseTokenizer and JapaneseAnalyzer no longer emits original tokens when discardCompoundToken option is not specified. The constructor option has been introduced since Lucene 8.5.0, and the default value is changed to true.</p>
+<p>When given the text &quot;株式会社&quot;, JapaneseTokenizer (mode != NORMAL) emits decompounded tokens &quot;株式&quot; and &quot;会社&quot; only and no longer outputs the original token &quot;株式会社&quot; by default. To output original tokens, discardCompoundToken option should be explicitly set to false. Be aware that if this option is set to false SynonymFilter or SynonymGraphFilter does not work correctly (see <a href="https://issues.apache.org/jira/browse/LUCENE-9173">LUCENE-9173</a>).</p>
+<h2 id="analysis-factories-now-have-customizable-symbolic-names-lucene-8778-and-need-additional-no-arg-constructor-lucene-9281">Analysis factories now have customizable symbolic names (<a href="https://issues.apache.org/jira/browse/LUCENE-8778">LUCENE-8778</a>) and need additional no-arg constructor (<a href="https://issues.apache.org/jira/browse/LUCENE-9281">LUCENE-9281</a>)</h2>
+<p>The SPI names for concrete subclasses of TokenizerFactory, TokenFilterFactory, and CharfilterFactory are no longer derived from their class name. Instead, each factory must have a static &quot;NAME&quot; field like this:</p>
+<pre><code>    /** o.a.l.a.standard.StandardTokenizerFactory's SPI name */
+    public static final String NAME = &quot;standard&quot;;
+</code></pre>
+<p>A factory can be resolved/instantiated with its NAME by using methods such as TokenizerFactory#lookupClass(String) or TokenizerFactory#forName(String, Map&lt;String,String&gt;).</p>
+<p>If there are any user-defined factory classes that don't have proper NAME field, an exception will be thrown when (re)loading factories. e.g., when calling TokenizerFactory#reloadTokenizers(ClassLoader).</p>
+<p>In addition starting all factories need to implement a public no-arg constructor, too. The reason for this change comes from the fact that Lucene now uses <code>java.util.ServiceLoader</code> instead its own implementation to load the factory classes to be compatible with Java Module System changes (e.g., load factories from modules). In the future, extensions to Lucene developed on the Java Module System may expose the factories from their <code>module-info.java</code> file instead of <code>META-INF/services</code>.</p>
+<p>This constructor is never called by Lucene, so by default it throws a UnsupportedOperationException. User-defined factory classes should implement it in the following way:</p>
+<pre><code>    /** Default ctor for compatibility with SPI */
+    public StandardTokenizerFactory() {
+      throw defaultCtorException();
+    }
+</code></pre>
+<p>(<code>defaultCtorException()</code> is a protected static helper method)</p>
+<h2 id="termsenum-is-now-fully-abstract-lucene-8292">TermsEnum is now fully abstract (<a href="https://issues.apache.org/jira/browse/LUCENE-8292">LUCENE-8292</a>)</h2>
+<p>TermsEnum has been changed to be fully abstract, so non-abstract subclass must implement all it's methods. Non-Performance critical TermsEnums can use BaseTermsEnum as a base class instead. The change was motivated by several performance issues with FilterTermsEnum that caused significant slowdowns and massive memory consumption due to not delegating all method from TermsEnum. See <a href="https://issues.apache.org/jira/browse/LUCENE-8292">LUCENE-8292</a> and <a href="https://issues.apache.org/jira/browse/LUCENE-8662">LUCENE-8662</a></p>
+<h2 id="ramdirectory-ramfile-raminputstream-ramoutputstream-removed">RAMDirectory, RAMFile, RAMInputStream, RAMOutputStream removed</h2>
+<p>RAM-based directory implementation have been removed. (<a href="https://issues.apache.org/jira/browse/LUCENE-8474">LUCENE-8474</a>). ByteBuffersDirectory can be used as a RAM-resident replacement, although it is discouraged in favor of the default memory-mapped directory.</p>
+<h2 id="similaritysimscorercomputexxxfactor-methods-removed-lucene-8014">Similarity.SimScorer.computeXXXFactor methods removed (<a href="https://issues.apache.org/jira/browse/LUCENE-8014">LUCENE-8014</a>)</h2>
+<p>SpanQuery and PhraseQuery now always calculate their slops as (1.0 / (1.0 + distance)).  Payload factor calculation is performed by PayloadDecoder in the queries module</p>
+<h2 id="scorer-must-produce-positive-scores-lucene-7996">Scorer must produce positive scores (<a href="https://issues.apache.org/jira/browse/LUCENE-7996">LUCENE-7996</a>)</h2>
+<p>Scorers are no longer allowed to produce negative scores. If you have custom query implementations, you should make sure their score formula may never produce negative scores.</p>
+<p>As a side-effect of this change, negative boosts are now rejected and FunctionScoreQuery maps negative values to 0.</p>
+<h2 id="customscorequery-boostedquery-and-boostingquery-removed-lucene-8099">CustomScoreQuery, BoostedQuery and BoostingQuery removed (<a href="https://issues.apache.org/jira/browse/LUCENE-8099">LUCENE-8099</a>)</h2>
+<p>Instead use FunctionScoreQuery and a DoubleValuesSource implementation.  BoostedQuery and BoostingQuery may be replaced by calls to FunctionScoreQuery.boostByValue() and FunctionScoreQuery.boostByQuery().  To replace more complex calculations in CustomScoreQuery, use the lucene-expressions module:</p>
+<pre><code>SimpleBindings bindings = new SimpleBindings();
+bindings.add(&quot;score&quot;, DoubleValuesSource.SCORES);
+bindings.add(&quot;boost1&quot;, DoubleValuesSource.fromIntField(&quot;myboostfield&quot;));
+bindings.add(&quot;boost2&quot;, DoubleValuesSource.fromIntField(&quot;myotherboostfield&quot;));
+Expression expr = JavascriptCompiler.compile(&quot;score * (boost1 + ln(boost2))&quot;);
+FunctionScoreQuery q = new FunctionScoreQuery(inputQuery, expr.getDoubleValuesSource(bindings));
+</code></pre>
+<h2 id="index-options-can-no-longer-be-changed-dynamically-lucene-8134">Index options can no longer be changed dynamically (<a href="https://issues.apache.org/jira/browse/LUCENE-8134">LUCENE-8134</a>)</h2>
+<p>Changing index options on the fly is now going to result into an IllegalArgumentException. If a field is indexed (FieldType.indexOptions() != IndexOptions.NONE) then all documents must have the same index options for that field.</p>
+<h2 id="indexsearchercreatenormalizedweight-removed-lucene-8242">IndexSearcher.createNormalizedWeight() removed (<a href="https://issues.apache.org/jira/browse/LUCENE-8242">LUCENE-8242</a>)</h2>
+<p>Instead use IndexSearcher.createWeight(), rewriting the query first, and using a boost of 1f.</p>
+<h2 id="memory-codecs-removed-lucene-8267">Memory codecs removed (<a href="https://issues.apache.org/jira/browse/LUCENE-8267">LUCENE-8267</a>)</h2>
+<p>Memory codecs have been removed from the codebase (MemoryPostings, MemoryDocValues).</p>
+<h2 id="direct-doc-value-format-removed-lucene-8917">Direct doc-value format removed (<a href="https://issues.apache.org/jira/browse/LUCENE-8917">LUCENE-8917</a>)</h2>
+<p>The &quot;Direct&quot; doc-value format has been removed from the codebase.</p>
+<h2 id="querycachingpolicyalways-cache-removed-lucene-8144">QueryCachingPolicy.ALWAYS_CACHE removed (<a href="https://issues.apache.org/jira/browse/LUCENE-8144">LUCENE-8144</a>)</h2>
+<p>Caching everything is discouraged as it disables the ability to skip non-interesting documents. ALWAYS_CACHE can be replaced by a UsageTrackingQueryCachingPolicy with an appropriate config.</p>
+<h2 id="english-stopwords-are-no-longer-removed-by-default-in-standardanalyzer-lucene-7444">English stopwords are no longer removed by default in StandardAnalyzer (LUCENE_7444)</h2>
+<p>To retain the old behaviour, pass EnglishAnalyzer.ENGLISH_STOP_WORDS_SET as an argument to the constructor</p>
+<h2 id="standardanalyzerenglish-stop-words-set-has-been-moved">StandardAnalyzer.ENGLISH_STOP_WORDS_SET has been moved</h2>
+<p>English stop words are now defined in EnglishAnalyzer#ENGLISH_STOP_WORDS_SET in the analysis-common module</p>
+<h2 id="topdocsmaxscore-removed">TopDocs.maxScore removed</h2>
+<p>TopDocs.maxScore is removed. IndexSearcher and TopFieldCollector no longer have an option to compute the maximum score when sorting by field. If you need to know the maximum score for a query, the recommended approach is to run a separate query:</p>
+<pre><code>  TopDocs topHits = searcher.search(query, 1);
+  float maxScore = topHits.scoreDocs.length == 0 ? Float.NaN : topHits.scoreDocs[0].score;
+</code></pre>
+<p>Thanks to other optimizations that were added to Lucene 8, this query will be able to efficiently select the top-scoring document without having to visit all matches.</p>
+<h2 id="topfieldcollector-always-assumes-fillfieldstrue">TopFieldCollector always assumes fillFields=true</h2>
+<p>Because filling sort values doesn't have a significant overhead, the fillFields option has been removed from TopFieldCollector factory methods. Everything behaves as if it was set to true.</p>
+<h2 id="topfieldcollector-no-longer-takes-a-trackdocscores-option">TopFieldCollector no longer takes a trackDocScores option</h2>
+<p>Computing scores at collection time is less efficient than running a second request in order to only compute scores for documents that made it to the top hits. As a consequence, the trackDocScores option has been removed and can be replaced with the new TopFieldCollector#populateScores helper method.</p>
+<h2 id="indexsearchersearchafter-may-return-lower-bounds-of-the-hit-count-and-topdocstotalhits-is-no-longer-a-long">IndexSearcher.search(After) may return lower bounds of the hit count and TopDocs.totalHits is no longer a long</h2>
+<p>Lucene 8 received optimizations for collection of top-k matches by not visiting all matches. However these optimizations won't help if all matches still need to be visited in order to compute the total number of hits. As a consequence, IndexSearcher's search and searchAfter methods were changed to only count hits accurately up to 1,000, and Topdocs.totalHits was changed from a long to an object that says whether the hit count is accurate or a lower bound of the actual hit count.</p>
+<h2 id="ramdirectory-ramfile-raminputstream-ramoutputstream-are-deprecated">RAMDirectory, RAMFile, RAMInputStream, RAMOutputStream are deprecated</h2>
+<p>This RAM-based directory implementation is an old piece of code that uses inefficient thread synchronization primitives and can be confused as &quot;faster&quot; than the NIO-based MMapDirectory. It is deprecated and scheduled for removal in future versions of Lucene. (<a href="https://issues.apache.org/jira/browse/LUCENE-8467">LUCENE-8467</a>, <a href="https://issues.apache.org/jira/browse/LUCENE-8438">LUCENE-8438</a>)</p>
+<h2 id="leafcollectorsetscorer-now-takes-a-scorable-rather-than-a-scorer">LeafCollector.setScorer() now takes a Scorable rather than a Scorer</h2>
+<p>Scorer has a number of methods that should never be called from Collectors, for example those that advance the underlying iterators.  To hide these, LeafCollector.setScorer() now takes a Scorable, an abstract class that Scorers can extend, with methods docId() and score() (<a href="https://issues.apache.org/jira/browse/LUCENE-6228">LUCENE-6228</a>)</p>
+<h2 id="scorers-must-have-non-null-weights">Scorers must have non-null Weights</h2>
+<p>If a custom Scorer implementation does not have an associated Weight, it can probably be replaced with a Scorable instead.</p>
+<h2 id="suggesters-now-return-long-instead-of-long-for-weight-during-indexing-and-double-instead-of-long-at-suggest-time">Suggesters now return Long instead of long for weight() during indexing, and double instead of long at suggest time</h2>
+<p>Most code should just require recompilation, though possibly requiring some added casts.</p>
+<h2 id="tokenstreamcomponents-is-now-final">TokenStreamComponents is now final</h2>
+<p>Instead of overriding TokenStreamComponents#setReader() to customise analyzer initialisation, you should now pass a Consumer&lt;Reader&gt; instance to the TokenStreamComponents constructor.</p>
+<h2 id="lowercasetokenizer-and-lowercasetokenizerfactory-have-been-removed">LowerCaseTokenizer and LowerCaseTokenizerFactory have been removed</h2>
+<p>LowerCaseTokenizer combined tokenization and filtering in a way that broke token normalization, so they have been removed. Instead, use a LetterTokenizer followed by a LowerCaseFilter</p>
+<h2 id="chartokenizer-no-longer-takes-a-normalizer-function">CharTokenizer no longer takes a normalizer function</h2>
+<p>CharTokenizer now only performs tokenization. To perform any type of filtering use a TokenFilter chain as you would with any other Tokenizer.</p>
+<h2 id="highlighter-and-fastvectorhighlighter-no-longer-support-toparenttochildblockjoinquery">Highlighter and FastVectorHighlighter no longer support ToParent/ToChildBlockJoinQuery</h2>
+<p>Both Highlighter and FastVectorHighlighter need a custom WeightedSpanTermExtractor or FieldQuery respectively in order to support ToParent/ToChildBlockJoinQuery.</p>
+<h2 id="multitermawarecomponent-replaced-by-charfilterfactorynormalize-and-tokenfilterfactorynormalize">MultiTermAwareComponent replaced by CharFilterFactory#normalize() and TokenFilterFactory#normalize()</h2>
+<p>Normalization is now type-safe, with CharFilterFactory#normalize() returning a Reader and TokenFilterFactory#normalize() returning a TokenFilter.</p>
+<h2 id="k11-constant-factor-removed-from-bm25-similarity-numerator-lucene-8563">k1+1 constant factor removed from BM25 similarity numerator (<a href="https://issues.apache.org/jira/browse/LUCENE-8563">LUCENE-8563</a>)</h2>
+<p>Scores computed by the BM25 similarity are lower than previously as the k1+1 constant factor was removed from the numerator of the scoring formula. Ordering of results is preserved unless scores are computed from multiple fields using different similarities. The previous behaviour is now exposed by the LegacyBM25Similarity class which can be found in the lucene-misc jar.</p>
+<h2 id="indexwritermaxdocnumdocs-removed-in-favor-of-indexwritergetdocstats">IndexWriter#maxDoc()/#numDocs() removed in favor of IndexWriter#getDocStats()</h2>
+<p>IndexWriter#getDocStats() should be used instead of #maxDoc() / #numDocs() which offers a consistent view on document stats. Previously calling two methods in order ot get point in time stats was subject to concurrent changes.</p>
+<h2 id="maxclausescount-moved-from-booleanquery-to-indexsearcher-lucene-8811">maxClausesCount moved from BooleanQuery To IndexSearcher (<a href="https://issues.apache.org/jira/browse/LUCENE-8811">LUCENE-8811</a>)</h2>
+<p>IndexSearcher now performs max clause count checks on all types of queries (including BooleanQueries). This led to a logical move of the clauses count from BooleanQuery to IndexSearcher.</p>
+<h2 id="topdocsmerge-shall-no-longer-allow-setting-of-shard-indices">TopDocs.merge shall no longer allow setting of shard indices</h2>
+<p>TopDocs.merge's API has been changed to stop allowing passing in a parameter to indicate if it should set shard indices for hits as they are seen during the merge process. This is done to simplify the API to be more dynamic in terms of passing in custom tie breakers. If shard indices are to be used for tie breaking docs with equal scores during TopDocs.merge, then it is mandatory that the input ScoreDocs have their shard indices set to valid values prior to calling TopDocs.merge</p>
+<h2 id="topdocscollector-shall-throw-illegalargumentexception-for-malformed-arguments">TopDocsCollector Shall Throw IllegalArgumentException For Malformed Arguments</h2>
+<p>TopDocsCollector shall no longer return an empty TopDocs for malformed arguments. Rather, an IllegalArgumentException shall be thrown. This is introduced for better defence and to ensure that there is no bubbling up of errors when Lucene is used in multi level applications</p>
+<h2 id="assumption-of-data-consistency-between-different-data-structures-sharing-the-same-field-name">Assumption of data consistency between different data-structures sharing the same field name</h2>
+<p>Sorting on a numeric field that is indexed with both doc values and points may use an optimization to skip non-competitive documents. This optimization relies on the assumption that the same data is stored in these points and doc values.</p>
+<h3 id="require-consistency-between-data-structures-on-a-per-field-basis">Require consistency between data-structures on a per-field basis</h3>
+<p>The per field data-structures are implicitly defined by the first document indexed that contains a certain field. Once defined, the per field data-structures are not changeable for the whole index. For example, if you first index a document where a certain field is indexed with doc values and points, all subsequent documents containing this field must also have this field indexed with only doc values and points.</p>
+<p>This also means that an index created in the previous version that doesn't satisfy this requirement can not be updated.</p>
+<h3 id="doc-values-updates-are-allowed-only-for-doc-values-only-fields">Doc values updates are allowed only for doc values only fields</h3>
+<p>Previously IndexWriter could update doc values for a binary or numeric docValue field that was also indexed with other data structures (e.g. postings, vectors etc). This is not allowed anymore. A field must be indexed with only doc values to be allowed for doc values updates in IndexWriter.</p>
+<h2 id="sorteddocvalues-no-longer-extends-binarydocvalues-lucene-9796">SortedDocValues no longer extends BinaryDocValues (<a href="https://issues.apache.org/jira/browse/LUCENE-9796">LUCENE-9796</a>)</h2>
+<p>SortedDocValues no longer extends BinaryDocValues: SortedDocValues do not have a per-document binary value, they have a per-document numeric <code>ordValue()</code>. The ordinal can then be dereferenced to its binary form with <code>lookupOrd()</code>, but it was a performance trap to implement a <code>binaryValue()</code> on the SortedDocValues api that does this behind-the-scenes on every document.</p>
+<p>You can replace calls of <code>binaryValue()</code> with <code>lookupOrd(ordValue())</code> as a &quot;quick fix&quot;, but it is better to use the ordinal alone (integer-based datastructures) for per-document access, and only call lookupOrd() a few times at the end (e.g. for the hits you want to display). Otherwise, if you really don't want per-document ordinals, but instead a per-document <code>byte[]</code>, use a BinaryDocValues field.</p>
+<h2 id="removed-codecreaderrambytesused-lucene-9387">Removed CodecReader.ramBytesUsed() (<a href="https://issues.apache.org/jira/browse/LUCENE-9387">LUCENE-9387</a>)</h2>
+<p>Lucene index readers are now using so little memory with the default codec that it was decided to remove the ability to estimate their RAM usage.</p>
+<h2 id="longvaluefacetcounts-no-longer-accepts-multivalued-param-in-constructors-lucene-9948">LongValueFacetCounts no longer accepts multiValued param in constructors (<a href="https://issues.apache.org/jira/browse/LUCENE-9948">LUCENE-9948</a>)</h2>
+<p>LongValueFacetCounts will now automatically detect whether-or-not an indexed field is single- or multi-valued. The user no longer needs to provide this information to the ctors. Migrating should be as simple as no longer providing this boolean.</p>
+<h2 id="spanquery-and-subclasses-have-moved-from-core-to-the-queries-module">SpanQuery and subclasses have moved from core/ to the queries module</h2>
+<p>They can now be found in the o.a.l.queries.spans package.</p>
+<h2 id="spanboostquery-has-been-removed-lucene-8143">SpanBoostQuery has been removed (<a href="https://issues.apache.org/jira/browse/LUCENE-8143">LUCENE-8143</a>)</h2>
+<p>SpanBoostQuery was a no-op unless used at the top level of a SpanQuery nested structure. Use a standard BoostQuery here instead.</p>
+<h2 id="sort-is-immutable-lucene-9325">Sort is immutable (<a href="https://issues.apache.org/jira/browse/LUCENE-9325">LUCENE-9325</a>)</h2>
+<p>Rather than using <code>setSort()</code> to change sort values, you should instead create a new Sort instance with the new values.</p>
+<h2 id="taxonomy-based-faceting-uses-more-modern-encodings-lucene-9450-lucene-10062-lucene-10122">Taxonomy-based faceting uses more modern encodings (<a href="https://issues.apache.org/jira/browse/LUCENE-9450">LUCENE-9450</a>, <a href="https://issues.apache.org/jira/browse/LUCENE-10062">LUCENE-10062</a>, <a href="https://issues.apache.org/jira/browse/LUCENE-10122">LUCENE-10122</a>)</h2>
+<p>The side-car taxonomy index now uses doc values for ord-to-path lookup (<a href="https://issues.apache.org/jira/browse/LUCENE-9450">LUCENE-9450</a>) and parent lookup (<a href="https://issues.apache.org/jira/browse/LUCENE-10122">LUCENE-10122</a>) instead of stored fields and positions (respectively). Document ordinals are now encoded with <code>SortedNumericDocValues</code> instead of using a custom (v-int) binary format. Performance gains have been observed with these encoding changes, but to benefit from them, users must create a new index using 9.x (it is not sufficient to reindex documents against an existing 8.x index). In order to remain backwards-compatible with 8.x indexes, the older format is retained until a full rebuild is done.</p>
+<p>Additionally, <code>OrdinalsReader</code> (and sub-classes) have been marked <code>@Deprecated</code> as custom binary encodings will not be supported for Document ordinals in 9.x onwards (<code>SortedNumericDocValues</code> are used out-of-the-box instead).</p>
+</body>
+</html>
