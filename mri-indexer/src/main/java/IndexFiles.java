@@ -1,13 +1,30 @@
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
+import org.apache.lucene.document.Document;
+import org.apache.lucene.document.Field;
+import org.apache.lucene.document.LongPoint;
+import org.apache.lucene.document.StringField;
+import org.apache.lucene.document.TextField;
+import org.apache.lucene.index.DirectoryReader;
+import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
+import org.apache.lucene.index.Term;
+import org.apache.lucene.index.IndexWriterConfig.OpenMode;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Date;
 
 public class IndexFiles {
@@ -59,39 +76,70 @@ public class IndexFiles {
             IndexWriterConfig iwc = new IndexWriterConfig(analyzer);
 
             if (create) {
-                iwc.setOpenMode(IndexWriterConfig.OpenMode.CREATE);
+                iwc.setOpenMode(OpenMode.CREATE);
             } else {
-                iwc.setOpenMode(IndexWriterConfig.OpenMode.CREATE_OR_APPEND);
+                iwc.setOpenMode(OpenMode.CREATE_OR_APPEND);
             }
 
 
-            try (IndexWriter writer = new IndexWriter(dir, iwc);
-                 IndexFiles indexFiles = new IndexFiles()) {
-                indexFiles.indexDocs(writer, docDir);
+            try (IndexWriter writer = new IndexWriter(dir, iwc)) {
 
-                // NOTE: if you want to maximize search performance,
-                // you can optionally call forceMerge here. This can be
-                // a terribly costly operation, so generally it's only
-                // worth it when your index is relatively static (ie
-                // you're done adding documents to it):
-                //
-                // writer.forceMerge(1);
-            } finally {
-                IOUtils.close(vectorDictInstance);
+				IndexFiles indexFiles = new IndexFiles();
+                indexFiles.indexDocs(writer, docDir);
             }
 
             Date end = new Date();
+			
             try (IndexReader reader = DirectoryReader.open(dir)) {
                 System.out.println("Indexed " + reader.numDocs() + " documents in " + (end.getTime() - start.getTime())
                         + " milliseconds");
-                if (reader.numDocs() > 100 && vectorDictSize < 1_000_000 && System.getProperty("smoketester") == null) {
-                    throw new RuntimeException(
-                            "Are you (ab)using the toy vector dictionary? See the package javadocs to understand why you got this exception.");
-                }
             }
         } catch (IOException e) {
             System.out.println(" caught a " + e.getClass() + "\n with message: " + e.getMessage());
         }
 
     }
+
+	void indexDocs(final IndexWriter writer, Path path) throws IOException {
+		if (Files.isDirectory(path)) {
+			Files.walkFileTree(path, new SimpleFileVisitor<Path>() {
+				@Override
+				public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
+					try {
+						indexDoc(writer, file, attrs.lastModifiedTime().toMillis());
+					} catch (IOException ex) {
+						ex.printStackTrace(System.err);
+						// don't index files that can't be read.
+					}
+					return FileVisitResult.CONTINUE;
+				}
+			});
+		} else {
+			indexDoc(writer, path, Files.getLastModifiedTime(path).toMillis());
+		}
+	}
+
+	/** Indexes a single document */
+	void indexDoc(IndexWriter writer, Path file, long lastModified) throws IOException {
+		try (InputStream stream = Files.newInputStream(file)) {
+			Document doc = new Document();
+
+			Field pathField = new StringField("path", file.toString(), Field.Store.YES);
+			doc.add(pathField);
+
+			doc.add(new LongPoint("modified", lastModified));
+
+			doc.add(new TextField("contents",
+					new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8))));
+
+
+			if (writer.getConfig().getOpenMode() == OpenMode.CREATE) {
+				System.out.println("adding " + file);
+				writer.addDocument(doc);
+			} else {
+				System.out.println("updating " + file);
+				writer.updateDocument(new Term("path", file.toString()), doc);
+			}
+		}
+	}
 }
