@@ -157,6 +157,9 @@ class WorkerThread implements Runnable{
 
 	public WorkerThread(Path docsFolder,MMapDirectory indexFolder, IndexWriterConfig iwc) {
 		// El indexWriterConfig se debería poder compartir entre distintos writers
+		// Problema: El indexWriterConfig tiene un metodo SetWriter que hace que la config
+		// ya esté siendo usada. Crearse una config nueva, pasando como parámetro el
+		//Analyzer y el modo de apertura de la config?
 		this.docsFolder = docsFolder;
 		try{
 			this.writer = new IndexWriter(indexFolder, iwc);
