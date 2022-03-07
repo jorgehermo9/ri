@@ -17,7 +17,6 @@ import org.apache.lucene.index.Term;
 import org.apache.lucene.index.IndexWriterConfig.OpenMode;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
-import org.apache.lucene.store.MMapDirectory;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -48,25 +47,24 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 public class IndexFiles {
-
-
     private IndexFiles(){}
 
     public static void main(String[] args) throws Exception {
         String usage = "java org.apache.lucene.demo.IndexFiles"
-                + " [-index INDEX_PATH] [-docs DOCS_PATH] [-update]\n\n"
-                + "This indexes the documents in DOCS_PATH, creating a Lucene index"
-                + "in INDEX_PATH that can be searched with SearchFiles\n";
+            + " [-index INDEX_PATH] [-docs DOCS_PATH] [-deep N] [-partialIndexes] \n"
+            + "[-openmode {create|append|create_or_append}] [-numThreads T]\n\n"
+            + "This indexes the documents in DOCS_PATH, creating a Lucene index"
+            + "in INDEX_PATH\n";
+            
         String indexPath = "/tmp/index";
         String docsPath = null;
 		OpenMode openmode = OpenMode.CREATE;
-		// Default threads to available cores
-		int numThreads = Runtime.getRuntime().availableProcessors();
+		int numThreads = Runtime.getRuntime().availableProcessors(); // Default threads to available cores
 		boolean partialIndexes = false;
-		// If no depth speified, not depth limit
-		int depth = Integer.MAX_VALUE;
+		int depth = Integer.MAX_VALUE; // If no depth speified, not depth limit
+
         for ( int i = 0; i < args.length; i++ ) {
-            switch (args[i]) {
+            switch ( args[i] ) {
                 case "-index":
                     indexPath = args[++i];
                     break;
@@ -75,14 +73,14 @@ public class IndexFiles {
                     break;
 				case "-openmode":
 					String openmode_arg = args[++i];
-					if(openmode_arg.equals("create"))
+					if ( openmode_arg.equals("create") )
 						openmode = OpenMode.CREATE;
-					else if(openmode_arg.equals("append"))
+					else if ( openmode_arg.equals("append") )
 						openmode = OpenMode.APPEND;
-					else if(openmode_arg.equals("create_or_append"))
+					else if ( openmode_arg.equals("create_or_append") )
 						openmode = OpenMode.CREATE_OR_APPEND;
 					else
-						throw new IllegalArgumentException("Open mode not supported: "+openmode_arg);
+						throw new IllegalArgumentException("Open mode not supported: " + openmode_arg);
 					break;
 				// Hace falta el update? Con el openmode ya lo dices
                 // case "-update":
@@ -96,11 +94,11 @@ public class IndexFiles {
 					break;
 				case "-deep":
 					depth = Integer.parseInt(args[++i]);
-					if(depth < 0){
+					if ( depth < 0 )
 						throw new IllegalArgumentException("deep cannot be negative");
-					}
 					break;
                 default:
+                    System.err.println("Usage: " + usage);
                     throw new IllegalArgumentException("unknown parameter " + args[i]);
             }
         }
@@ -108,37 +106,36 @@ public class IndexFiles {
             System.err.println("Usage: " + usage);
             System.exit(1);
         }
-        final Path docDir = Paths.get(docsPath);
+        Path docDir = Paths.get(docsPath);
         if ( !Files.isReadable(docDir) ) {
-            System.out.println("Document directory '" + docDir.toAbsolutePath()
-                    + "' does not exist or is not readable, please check the path");
+            System.err.println("Document directory '" + docDir.toAbsolutePath()
+                + "' does not exist or is not readable, please check the path");
             System.exit(1);
         }
 
-		Properties properties = new Properties();
-		properties.load(new FileInputStream(new File("src/main/resources/config.properties")));
-
-		ArrayList<String> onlyFiles = null;
+        ArrayList<String> onlyFiles = null;
 		Integer onlyTopLines = null;
 		Integer onlyBottomLines = null;
-		if(properties.getProperty("onlyFiles") != null){
-			onlyFiles = new ArrayList<>(Arrays.asList(properties.getProperty("onlyFiles").split(" ")));
-		}
-		if(properties.getProperty("onlyTopLines") != null){
-			onlyTopLines = Integer.parseInt(properties.getProperty("onlyTopLines"));
-			if(onlyTopLines < 0){
-				throw new IllegalArgumentException("onlyTopLines cannot be negative");
-			}
-		}
-		if(properties.getProperty("onlyBottomLines") != null){
-			onlyBottomLines = Integer.parseInt(properties.getProperty("onlyBottomLines"));
-			if(onlyBottomLines < 0){
-				throw new IllegalArgumentException("onlyBottomLines cannot be negative");
-			}
-		}
+        try {
+            Properties properties = new Properties();
+            properties.load(new FileInputStream(new File("src/main/resources/config.properties")));
 
-
-
+            if ( properties.getProperty("onlyFiles") != null ) {
+                onlyFiles = new ArrayList<>(Arrays.asList(properties.getProperty("onlyFiles").split(" ")));
+            }
+            if ( properties.getProperty("onlyTopLines") != null ) {
+                onlyTopLines = Integer.parseInt(properties.getProperty("onlyTopLines"));
+                if ( onlyTopLines < 0 )
+                    throw new IllegalArgumentException("onlyTopLines cannot be negative");
+            }
+            if ( properties.getProperty("onlyBottomLines") != null ) {
+                onlyBottomLines = Integer.parseInt(properties.getProperty("onlyBottomLines"));
+                if ( onlyBottomLines < 0 )
+                    throw new IllegalArgumentException("onlyBottomLines cannot be negative");
+            }
+        } catch (IOException e) {
+            System.err.println("Error while reading config file in src/main/resources/config.properties");
+        }
 
         Date start = new Date();
         try {
@@ -150,89 +147,88 @@ public class IndexFiles {
 
             iwc.setOpenMode(openmode);
 			
+            IndexWriter mainWriter = new IndexWriter(dir, iwc);
 
-            try (IndexWriter mainWriter = new IndexWriter(dir, iwc)) {
-				List<IndexWriter> partialWriterList = null;
-				if (partialIndexes){
-					partialWriterList = new ArrayList<IndexWriter>();
-				}
-				final ExecutorService executor = Executors.newFixedThreadPool(numThreads);
-				try (DirectoryStream<Path> directoryStream = Files.newDirectoryStream(docDir)) {
-					/* We process each subfolder in a new thread. */
-					for ( final Path path : directoryStream ) {
-						if ( Files.isDirectory(path)) {
-							if (depth <=0) break;//Si la depth original es <=0
-							//Default using mainWriter (shared)
-							if(partialIndexes){
-								Path partialPath = Paths.get(indexPath+"_"+path.getFileName());
-								Directory partialDir = FSDirectory.open(partialPath);
-								IndexWriterConfig partialIwc = new IndexWriterConfig(new StandardAnalyzer());
-								partialIwc.setOpenMode(openmode);
+            List<IndexWriter> partialWriterList = null;
+            if ( partialIndexes )
+                partialWriterList = new ArrayList<IndexWriter>();
+            
+            final ExecutorService executor = Executors.newFixedThreadPool(numThreads);
+            try (DirectoryStream<Path> directoryStream = Files.newDirectoryStream(docDir)) {
+                for ( final Path path : directoryStream ) {
+                    if ( depth <= 0 ) break;
+                    if ( !Files.isDirectory(path) ) continue;
 
-								IndexWriter partialWriter = new IndexWriter(partialDir,partialIwc);
-								partialWriterList.add(partialWriter);
-								//Esto se hace así y no con una variable que guarde el writer que va a usar el worker,
-								//ya que sale un warning de recurso sin cerrar, debido a que metemos el writer en una
-								//lista y lo cerramos fuera del scope. Lo hacemos así aunque repetimos código para que no
-								//salga ese warning
+                    if ( partialIndexes ) {
+                        Path partialPath = Paths.get(indexPath + "_" + path.getFileName());
+                        Directory partialDir = FSDirectory.open(partialPath);
+                        IndexWriterConfig partialIwc = new IndexWriterConfig(new StandardAnalyzer());
+                        partialIwc.setOpenMode(openmode);
 
-								Runnable worker = new WorkerThread(path,partialWriter,depth,onlyFiles,onlyTopLines,onlyBottomLines);
-								executor.execute(worker);
-							}else{
-								Runnable worker = new WorkerThread(path,mainWriter,depth,onlyFiles,onlyTopLines,onlyBottomLines);
-								executor.execute(worker);
-							}
-							
-						}
-					}
-					//Recorrer los archivos que cuelguen del root de docDir
-					//Preguntar si hacerlo cuando depth >0 o hacerlo con depth=0
-					if (depth >0){
-						Runnable worker = new WorkerThread(docDir,mainWriter,1,onlyFiles,onlyTopLines,onlyBottomLines);
-						executor.execute(worker);
-					}
-					
+                        IndexWriter partialWriter = new IndexWriter(partialDir,partialIwc);
+                        partialWriterList.add(partialWriter);
+                        // Esto se hace así y no con una variable que guarde el writer que va a usar el worker,
+                        // ya que sale un warning de recurso sin cerrar, debido a que metemos el writer en una
+                        // lista y lo cerramos fuera del scope.
 
-				} catch (final IOException e) {
-					e.printStackTrace();
-					System.exit(-1);
-				}
-		
-				executor.shutdown();
-		
-				try {
-					executor.awaitTermination(1, TimeUnit.HOURS);
-				} catch (final InterruptedException e) {
-					e.printStackTrace();
-					System.exit(-2);
-				}finally{
-					if (partialWriterList !=null){
-						for(IndexWriter partialWriter : partialWriterList){
-							partialWriter.commit();
-							partialWriter.close();
-						}
-					}
-				}
-		
-				System.out.println("Finished all threads");
-				
-				if(partialIndexes){
-					Directory[] partialDirs = new Directory[partialWriterList.size()];
-					for(int i = 0; i < partialWriterList.size();i++){
-						partialDirs[i] = partialWriterList.get(i).getDirectory();
-					}
-					mainWriter.addIndexes(partialDirs);
-				}
-				
+                        Runnable worker = new WorkerThread(path,partialWriter,depth,onlyFiles,onlyTopLines,onlyBottomLines);
+                        executor.execute(worker);
+                    } else {
+                        Runnable worker = new WorkerThread(path,mainWriter,depth,onlyFiles,onlyTopLines,onlyBottomLines);
+                        executor.execute(worker);
+                    }
+                }
+                // Recorrer los archivos que cuelguen del root de docDir
+                // Preguntar si hacerlo cuando depth > 0 o hacerlo con depth=0
+                if ( depth > 0 ) {
+                    Runnable worker = new WorkerThread(docDir,mainWriter,1,onlyFiles,onlyTopLines,onlyBottomLines);
+                    executor.execute(worker);
+                }
+
+            } catch (IOException e) {
+                e.printStackTrace();
+                System.exit(1);
             }
+    
+            executor.shutdown();
+    
+            try {
+                executor.awaitTermination(1, TimeUnit.HOURS);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+                System.exit(2);
+            } finally {
+                if ( partialWriterList != null ) {
+                    for ( IndexWriter partialWriter : partialWriterList ) {
+                        partialWriter.commit();
+                        partialWriter.close();
+                    }
+                }
+            }
+    
+            // System.out.println("Finished all threads");
+            
+            if ( partialIndexes ) {
+                Directory[] partialDirs = new Directory[partialWriterList.size()];
+                for ( int i = 0; i < partialWriterList.size(); i++ )
+                    partialDirs[i] = partialWriterList.get(i).getDirectory();
+            
+                mainWriter.addIndexes(partialDirs);
+            }
+
+            mainWriter.commit();
+            mainWriter.close();
+            System.out.println("Finished writing index to: " + indexPath);
+
             Date end = new Date();
-			
             try (IndexReader reader = DirectoryReader.open(dir)) {
                 System.out.println("Indexed " + reader.numDocs() + " documents in " + (end.getTime() - start.getTime())
                     + " milliseconds");
             }
+            
         } catch (IOException e) {
-            System.out.println(" caught a " + e.getClass() + "\n with message: " + e.getMessage());
+            System.err.println(" caught a " + e.getClass() + "\n with message: " + e.getMessage());
+            System.exit(1);
         }
     }
 }
@@ -244,27 +240,19 @@ class WorkerThread implements Runnable {
 	private ArrayList<String> onlyFiles;
 	private Integer	onlyTopLines;
 	private Integer	onlyBottomLines;
-	// public WorkerThread(Path docsFolder, MMapDirectory indexFolder, IndexWriterConfig iwc) {
-	// 	this.docsFolder = docsFolder;
-	// 	try{
-	// 		this.writer = new IndexWriter(indexFolder, iwc);
-	// 	} catch (IOException e) {
-	// 		e.printStackTrace();
-	// 	}
-	// }
-	public WorkerThread(Path docsFolder,IndexWriter writer,int depth,List<String> onlyFiles,Integer onlyTopLines, Integer onlyBottomLines){
 
+	public WorkerThread(Path docsFolder, IndexWriter writer, int depth, List<String> onlyFiles, Integer onlyTopLines, Integer onlyBottomLines) {
 		this.docsFolder = docsFolder;
 		this.writer = writer;
 		this.depth = depth;
-		this.onlyFiles = onlyFiles !=null ? new ArrayList<>(onlyFiles): null;
+		this.onlyFiles = onlyFiles != null ? new ArrayList<>(onlyFiles) : null;
 		this.onlyTopLines = onlyTopLines;
 		this.onlyBottomLines = onlyBottomLines;
 	}
 
 	@Override
 	public void run() {
-		try{
+		try {
 			this.indexDocs();
 		} catch (IOException e){
 			e.printStackTrace();
@@ -273,36 +261,35 @@ class WorkerThread implements Runnable {
 
 	private void indexDocs() throws IOException {
 		Path path = this.docsFolder;
-		if ( Files.isDirectory(path) ) {
-			Files.walkFileTree(path, EnumSet.noneOf(FileVisitOption.class),depth,new SimpleFileVisitor<Path>() {
-				@Override
-				public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
-					
-					//Con la limitación de depth, las carpetas que no se sigan explorando
-					//van a visitarse con este método y no se iterará sobre sus subarchivos,
-					//por lo que es una carpeta y no un archivo, no se va a indexar
-					if (Files.isDirectory(file)) return FileVisitResult.CONTINUE;
-
-
-					//En este punto se que el file es un archivo y no una carpeta
-					String fileName = file.getFileName().toString();
-					int i = fileName.lastIndexOf(".");
-					String extension = i>=0?fileName.substring(i):"";
-					if(onlyFiles !=null && !onlyFiles.contains(extension))
-						return FileVisitResult.CONTINUE;
-						
-					try {
-						indexDoc(file, attrs);
-					} catch (IOException ex) {
-						ex.printStackTrace(System.err);
-					}
-					return FileVisitResult.CONTINUE;
-				}
-			});
-		} else {//En teoría no se analizan los archivos normales del primer nivel. Esto es por si acaso.
+		if ( !Files.isDirectory(path) ) {
 			BasicFileAttributes fileAttrs = Files.readAttributes(path,BasicFileAttributes.class);
 			indexDoc(path, fileAttrs);
-		}
+            return;
+        }
+
+        Files.walkFileTree(path, EnumSet.noneOf(FileVisitOption.class), depth, new SimpleFileVisitor<Path>() {
+            @Override
+            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
+                // Con la limitación de depth, las carpetas que no se sigan explorando
+                // van a visitarse con este método y no se iterará sobre sus subarchivos,
+                // por lo que es una carpeta y no un archivo, no se va a indexar
+                if ( Files.isDirectory(file) ) return FileVisitResult.CONTINUE;
+
+                // En este punto se que el file es un archivo y no una carpeta
+                String fileName = file.getFileName().toString();
+                int i = fileName.lastIndexOf(".");
+                String extension = i >= 0 ? fileName.substring(i) : "";
+                if ( onlyFiles != null && !onlyFiles.contains(extension) )
+                    return FileVisitResult.CONTINUE;
+                    
+                try {
+                    indexDoc(file, attrs);
+                } catch (IOException ex) {
+                    ex.printStackTrace(System.err);
+                }
+                return FileVisitResult.CONTINUE;
+            }
+        });
 	}
 
 	private void indexDoc(Path file, BasicFileAttributes attrs) throws IOException {
@@ -317,7 +304,7 @@ class WorkerThread implements Runnable {
 			doc.add(new LongPoint("modified", attrs.lastModifiedTime().toMillis()));
 
 			String content = new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8)).lines().collect(Collectors.joining("\n"));
-			doc.add(new TextField("contents", content, Field.Store.NO)); //Original contents field
+			doc.add(new TextField("contents", content, Field.Store.NO)); // Original contents field
 
 			// Preguntar si tokenizar esto o no (En caso de que no, utilizar StringField)
 			doc.add(new TextField("contentsStored", content, Field.Store.YES)); // Contents stored
@@ -338,7 +325,7 @@ class WorkerThread implements Runnable {
 			else //if(attrs.isOther())
 				type = "other";
 
-			doc.add(new StringField("type",type, Field.Store.YES));
+			doc.add(new StringField("type", type, Field.Store.YES));
 
 			// El nombre debería ser sizeKB en el field...son bytes, no bits
 			// Divido entre 1000 y no entre 1024. Para que fuese entre 1024, deberían pedirse Kibibytes.
@@ -354,7 +341,6 @@ class WorkerThread implements Runnable {
 			FileTime lastModifiedTime = attrs.lastModifiedTime();
 			doc.add(new StringField("lastModifiedTime", lastModifiedTime.toString(), Field.Store.YES));
 
-
 			String creationTimeLucene = DateTools.dateToString(new Date(creationTime.toMillis()), Resolution.MILLISECOND);
 			doc.add(new StringField("creationTimeLucene", creationTimeLucene, Field.Store.YES));
 
@@ -364,32 +350,32 @@ class WorkerThread implements Runnable {
 			String lastModifiedTimeLucene = DateTools.dateToString(new Date(lastModifiedTime.toMillis()), Resolution.MILLISECOND);
 			doc.add(new StringField("lastModifiedTimeLucene", lastModifiedTimeLucene, Field.Store.YES));
 
-			
-			if(this.onlyTopLines !=null){
+			if ( this.onlyTopLines != null ) {
 				List<String> splittedContent = Arrays.asList(content.split("\n"));
 				int totalLines= splittedContent.size();
 				int linesToRead = totalLines < onlyTopLines ? totalLines : onlyTopLines;
 				List<String> lines = splittedContent.subList(0, linesToRead);
 				StringBuilder sb = new StringBuilder();
-				for (String line: lines){
+				for ( String line : lines )
 					sb.append(line+"\n");
-				}
+
 				String onlyTopContent = new String(sb);
-				doc.add(new TextField("onlyTopLines",onlyTopContent,Field.Store.YES));
+				doc.add(new TextField("onlyTopLines", onlyTopContent, Field.Store.YES));
 			}
 
-			if(this.onlyBottomLines !=null){
+			if ( this.onlyBottomLines != null ) {
 				List<String> splittedContent = Arrays.asList(content.split("\n"));
 				int totalLines= splittedContent.size();
 				int linesToRead = totalLines < onlyBottomLines ? totalLines : onlyBottomLines;
 				List<String> lines = splittedContent.subList(totalLines-linesToRead, totalLines);
 				StringBuilder sb = new StringBuilder();
-				for (String line: lines){
+				for ( String line : lines )
 					sb.append(line+"\n");
-				}
+
 				String onlyBottomContent = new String(sb);
-				doc.add(new TextField("onlyBottomLines",onlyBottomContent,Field.Store.YES));
+				doc.add(new TextField("onlyBottomLines", onlyBottomContent, Field.Store.YES));
 			}
+
 			if ( writer.getConfig().getOpenMode() == OpenMode.CREATE ) {
 				System.out.println("adding " + file);
 				writer.addDocument(doc);
