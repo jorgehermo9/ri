@@ -62,6 +62,7 @@ public class IndexFiles {
 		int numThreads = Runtime.getRuntime().availableProcessors(); // Default threads to available cores
 		boolean partialIndexes = false;
 		int depth = Integer.MAX_VALUE; // If no depth speified, not depth limit
+		boolean update = false;
 
         for ( int i = 0; i < args.length; i++ ) {
             switch ( args[i] ) {
@@ -82,10 +83,9 @@ public class IndexFiles {
 					else
 						throw new IllegalArgumentException("Open mode not supported: " + openmode_arg);
 					break;
-				// Hace falta el update? Con el openmode ya lo dices
-                // case "-update":
-                //     create = false;
-                //     break;
+                case "-update":
+                    update = true;
+                    break;
 				case "-numThreads":
 					numThreads = Integer.parseInt(args[++i]);
 					break;
@@ -171,19 +171,16 @@ public class IndexFiles {
                         // ya que sale un warning de recurso sin cerrar, debido a que metemos el writer en una
                         // lista y lo cerramos fuera del scope.
 
-                        Runnable worker = new WorkerThread(path,partialWriter,depth,onlyFiles,onlyTopLines,onlyBottomLines);
+                        Runnable worker = new WorkerThread(path,partialWriter,update,depth,onlyFiles,onlyTopLines,onlyBottomLines);
                         executor.execute(worker);
                     } else {
-                        Runnable worker = new WorkerThread(path,mainWriter,depth,onlyFiles,onlyTopLines,onlyBottomLines);
+                        Runnable worker = new WorkerThread(path,mainWriter,update,depth,onlyFiles,onlyTopLines,onlyBottomLines);
                         executor.execute(worker);
                     }
                 }
-                // Recorrer los archivos que cuelguen del root de docDir
-                // Preguntar si hacerlo cuando depth > 0 o hacerlo con depth=0
-                if ( depth > 0 ) {
-                    Runnable worker = new WorkerThread(docDir,mainWriter,1,onlyFiles,onlyTopLines,onlyBottomLines);
-                    executor.execute(worker);
-                }
+				// Always index root files 
+				Runnable worker = new WorkerThread(docDir,mainWriter,update,1,onlyFiles,onlyTopLines,onlyBottomLines);
+				executor.execute(worker);
 
             } catch (IOException e) {
                 e.printStackTrace();
@@ -236,14 +233,16 @@ public class IndexFiles {
 class WorkerThread implements Runnable {
 	private Path docsFolder;
 	private IndexWriter writer;
+	private boolean update;
 	private int depth;
 	private ArrayList<String> onlyFiles;
 	private Integer	onlyTopLines;
 	private Integer	onlyBottomLines;
 
-	public WorkerThread(Path docsFolder, IndexWriter writer, int depth, List<String> onlyFiles, Integer onlyTopLines, Integer onlyBottomLines) {
+	public WorkerThread(Path docsFolder, IndexWriter writer,boolean update, int depth, List<String> onlyFiles, Integer onlyTopLines, Integer onlyBottomLines) {
 		this.docsFolder = docsFolder;
 		this.writer = writer;
+		this.update = update;
 		this.depth = depth;
 		this.onlyFiles = onlyFiles != null ? new ArrayList<>(onlyFiles) : null;
 		this.onlyTopLines = onlyTopLines;
@@ -306,7 +305,6 @@ class WorkerThread implements Runnable {
 			String content = new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8)).lines().collect(Collectors.joining("\n"));
 			doc.add(new TextField("contents", content, Field.Store.NO)); // Original contents field
 
-			// Preguntar si tokenizar esto o no (En caso de que no, utilizar StringField)
 			doc.add(new TextField("contentsStored", content, Field.Store.YES)); // Contents stored
 
 			String hostname = InetAddress.getLocalHost().getHostName();
@@ -329,8 +327,11 @@ class WorkerThread implements Runnable {
 
 			// El nombre debería ser sizeKB en el field...son bytes, no bits
 			// Divido entre 1000 y no entre 1024. Para que fuese entre 1024, deberían pedirse Kibibytes.
-			long sizeKb = attrs.size()/1000;
-			doc.add(new LongPoint("sizeKb", sizeKb));
+			Long sizeKb = attrs.size()/1000;
+			// Campo para query por rangos
+			doc.add(new LongPoint("sizeKbNumeric", sizeKb));
+			//Campo para ver el valor del size
+			doc.add(new StringField("sizeKb", sizeKb.toString(),Field.Store.YES));
 
 			FileTime creationTime = attrs.creationTime();
 			doc.add(new StringField("creationTime", creationTime.toString(), Field.Store.YES));
@@ -380,8 +381,13 @@ class WorkerThread implements Runnable {
 				System.out.println("adding " + file);
 				writer.addDocument(doc);
 			} else {
-				System.out.println("updating " + file);
-				writer.updateDocument(new Term("path", file.toString()), doc);
+				if(this.update){
+					System.out.println("updating " + file);
+					writer.updateDocument(new Term("path", file.toString()), doc);
+				}else{
+					System.out.println("adding " + file);
+					writer.addDocument(doc);
+				}
 			}
 		}
 	}
