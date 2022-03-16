@@ -10,7 +10,7 @@ mvn exec:java -Dexec.mainClass="es.udc.ri.IndexFiles" -Dexec.args="args"
 mvn exec:java -Dexec.mainClass="es.udc.ri.IndexFiles" -Dexec.args="-index /tmp/index3 -docs /home/jorge/apuntes/current -openmode create -partialIndexes -numThreads 20"
 ```
 ```console
-mvn exec:java -Dexec.mainClass="es.udc.ri.IndexFiles" -Dexec.args="-index /tmp/index4 -docs /home/jorge/tmp/docs -openmode create -partialIndexes -numThreads 20"
+mvn exec:java -Dexec.mainClass="es.udc.ri.IndexFiles" -Dexec.args="-index /tmp/index -docs /home/jorge/github/ri/docs -openmode create -partialIndexes -numThreads 20"
 ```
 
 ```console

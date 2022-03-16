@@ -6,11 +6,13 @@ import org.apache.lucene.document.DateTools;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.DoublePoint;
 import org.apache.lucene.document.Field;
+import org.apache.lucene.document.FieldType;
 import org.apache.lucene.document.LongPoint;
 import org.apache.lucene.document.StringField;
 import org.apache.lucene.document.TextField;
 import org.apache.lucene.document.DateTools.Resolution;
 import org.apache.lucene.index.DirectoryReader;
+import org.apache.lucene.index.IndexOptions;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
@@ -48,6 +50,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 public class IndexFiles {
+
     private IndexFiles(){}
 
     public static void main(String[] args) throws Exception {
@@ -239,6 +242,7 @@ class WorkerThread implements Runnable {
 	private ArrayList<String> onlyFiles;
 	private Integer	onlyTopLines;
 	private Integer	onlyBottomLines;
+	private FieldType myFieldTypeStored;
 
 	public WorkerThread(Path docsFolder, IndexWriter writer,boolean update, int depth, List<String> onlyFiles, Integer onlyTopLines, Integer onlyBottomLines) {
 		this.docsFolder = docsFolder;
@@ -248,6 +252,17 @@ class WorkerThread implements Runnable {
 		this.onlyFiles = onlyFiles != null ? new ArrayList<>(onlyFiles) : null;
 		this.onlyTopLines = onlyTopLines;
 		this.onlyBottomLines = onlyBottomLines;
+
+		this.myFieldTypeStored = new FieldType();
+
+		IndexOptions options = IndexOptions.DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS;
+		myFieldTypeStored.setIndexOptions(options);
+		myFieldTypeStored.setTokenized(true);
+		myFieldTypeStored.setStored(true);
+		myFieldTypeStored.setStoreTermVectors(true);
+		myFieldTypeStored.setStoreTermVectorPositions(true);
+		myFieldTypeStored.freeze();
+
 	}
 
 	@Override
@@ -258,6 +273,8 @@ class WorkerThread implements Runnable {
 			e.printStackTrace();
 		}
 	}
+
+	
 
 	private void indexDocs() throws IOException {
 		Path path = this.docsFolder;
@@ -294,6 +311,7 @@ class WorkerThread implements Runnable {
 
 	private void indexDoc(Path file, BasicFileAttributes attrs) throws IOException {
 		IndexWriter writer = this.writer;
+		
 
 		try (InputStream stream = Files.newInputStream(file)) {
 			Document doc = new Document();
@@ -306,7 +324,7 @@ class WorkerThread implements Runnable {
 			String content = new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8)).lines().collect(Collectors.joining("\n"));
 			doc.add(new TextField("contents", content, Field.Store.NO)); // Original contents field
 
-			doc.add(new TextField("contentsStored", content, Field.Store.YES)); // Contents stored
+			doc.add(new Field("contentsStored", content, this.myFieldTypeStored)); // Contents stored
 
 			String hostname = InetAddress.getLocalHost().getHostName();
 			doc.add(new StringField("hostname", hostname, Field.Store.YES));
@@ -363,7 +381,7 @@ class WorkerThread implements Runnable {
 				//Borar último \n
 				sb.deleteCharAt(sb.length()-1);
 				String onlyTopContent = new String(sb);
-				doc.add(new TextField("onlyTopLines", onlyTopContent, Field.Store.YES));
+				doc.add(new Field("onlyTopLines", onlyTopContent, this.myFieldTypeStored));
 			}
 
 			if ( this.onlyBottomLines != null ) {
@@ -377,7 +395,7 @@ class WorkerThread implements Runnable {
 				//Borar último \n
 				sb.deleteCharAt(sb.length()-1);
 				String onlyBottomContent = new String(sb);
-				doc.add(new TextField("onlyBottomLines", onlyBottomContent, Field.Store.YES));
+				doc.add(new Field("onlyBottomLines", onlyBottomContent, this.myFieldTypeStored));
 			}
 
 			if ( writer.getConfig().getOpenMode() == OpenMode.CREATE ) {
