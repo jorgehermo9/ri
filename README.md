@@ -16,3 +16,6 @@ mvn exec:java -Dexec.mainClass="es.udc.ri.IndexFiles" -Dexec.args="-index /tmp/i
 ```console
 mvn exec:java -Dexec.mainClass="es.udc.ri.StatsField" -Dexec.args="-index /tmp/index4"
 ```
+```console
+mvn exec:java -Dexec.mainClass="es.udc.ri.WriteIndex" -Dexec.args="-index /tmp/index -outputfile file.txt"
+```

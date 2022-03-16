@@ -80,7 +80,7 @@ public class WriteIndex{
 
 			dir.close();
 			indexReader.close();
-		}catch (IOException e) {
+		}catch (Exception e) {
             System.err.println(" caught a " + e.getClass() + "\n with message: " + e.getMessage());
             System.exit(1);
         }

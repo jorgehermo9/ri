@@ -94,7 +94,7 @@ public class StatsField{
 
 			dir.close();
 			indexReader.close();
-		} catch (IOException e) {
+		} catch (Exception e) {
             System.err.println("Caught a " + e.getClass() + "\n with message: " + e.getMessage());
             System.exit(1);
         }
