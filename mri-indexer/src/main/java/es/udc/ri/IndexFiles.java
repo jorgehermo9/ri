@@ -224,7 +224,7 @@ public class IndexFiles {
             }
             
         } catch (IOException e) {
-            System.err.println(" caught a " + e.getClass() + "\n with message: " + e.getMessage());
+            System.err.println("Caught a " + e.getClass() + "\n with message: " + e.getMessage());
             System.exit(1);
         }
     }

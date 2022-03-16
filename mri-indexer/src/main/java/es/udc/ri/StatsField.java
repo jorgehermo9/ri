@@ -39,9 +39,7 @@ public class StatsField{
           System.exit(1);
         }
 
-		try{
-			//Preguntar si hace falta describir las exepciones que pueden pasar
-			//o simplemente un catch general
+		try {
 			Directory dir = FSDirectory.open(Paths.get(indexPath));
 			DirectoryReader indexReader = DirectoryReader.open(dir);
 
@@ -49,8 +47,7 @@ public class StatsField{
 			
 			HashSet<String> fields = new HashSet<>();
 
-			if (field ==null){
-				// // Preguntar si está bien recorrer todas las leaf para pillar los fields
+			if ( field == null ) {
 				// for(LeafReaderContext leaf : indexReader.leaves()){
 				// 	LeafReader leafReader = leaf.reader();
 				// 	FieldInfos fieldInfos = leafReader.getFieldInfos();
@@ -65,39 +62,40 @@ public class StatsField{
 				// }
 
 				FieldInfos fieldInfos = FieldInfos.getMergedFieldInfos(indexReader);
-				for(FieldInfo fieldInfo: fieldInfos){
+				for ( FieldInfo fieldInfo : fieldInfos )
 					fields.add(fieldInfo.name);
-				}
-			}else{
+				
+			} else {
 				fields.add(field);
 			}
+
 			System.out.println("\nIndex Statistics");
 
-			System.out.printf("%-80s\n","-".repeat(80));
+			System.out.printf("%-80s\n", "-".repeat(80));
 
-			System.out.printf("|%-23s | ","field");
-			System.out.printf("%-8s | ","docCount");
-			System.out.printf("%-8s | ","maxDoc");
-			System.out.printf("%-10s | ","sumDocFreq");
-			System.out.printf("%-17s|\n","sumCollectionFreq");
+			System.out.printf("|%-23s | ", "field");
+			System.out.printf("%-8s | ", "docCount");
+			System.out.printf("%-8s | ", "maxDoc");
+			System.out.printf("%-10s | ", "sumDocFreq");
+			System.out.printf("%-17s|\n", "sumCollectionFreq");
 
-			System.out.printf("%-80s\n","-".repeat(80));
-			for(String f: fields){
+			System.out.printf("%-80s\n", "-".repeat(80));
+			for ( String f : fields ) {
 				CollectionStatistics stats = searcher.collectionStatistics(f);
 				// Si no hay estadísticas para ese campo, por ejemplo, los LongPoint no indexan términos
-				if (stats == null){continue;}
-				System.out.printf("|%-23s | ",stats.field());
-				System.out.printf("%-8d | ",stats.docCount());
-				System.out.printf("%-8d | ",stats.maxDoc());
-				System.out.printf("%-10d | ",stats.sumDocFreq());
-				System.out.printf("%-17d|\n",stats.sumTotalTermFreq());
+				if ( stats == null ) continue;
+				System.out.printf("|%-23s | ", stats.field());
+				System.out.printf("%-8d | ", stats.docCount());
+				System.out.printf("%-8d | ", stats.maxDoc());
+				System.out.printf("%-10d | ", stats.sumDocFreq());
+				System.out.printf("%-17d|\n", stats.sumTotalTermFreq());
 			}
-			System.out.printf("%-80s\n","-".repeat(80));
+			System.out.printf("%-80s\n", "-".repeat(80));
 
 			dir.close();
 			indexReader.close();
-		}catch (IOException e) {
-            System.err.println(" caught a " + e.getClass() + "\n with message: " + e.getMessage());
+		} catch (IOException e) {
+            System.err.println("Caught a " + e.getClass() + "\n with message: " + e.getMessage());
             System.exit(1);
         }
 
