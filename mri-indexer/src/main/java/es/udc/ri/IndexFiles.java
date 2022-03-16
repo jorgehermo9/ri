@@ -4,6 +4,7 @@ import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.DateTools;
 import org.apache.lucene.document.Document;
+import org.apache.lucene.document.DoublePoint;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.LongPoint;
 import org.apache.lucene.document.StringField;
@@ -327,9 +328,9 @@ class WorkerThread implements Runnable {
 
 			// El nombre debería ser sizeKB en el field...son bytes, no bits
 			// Divido entre 1000 y no entre 1024. Para que fuese entre 1024, deberían pedirse Kibibytes.
-			Long sizeKb = attrs.size()/1000;
+			Double sizeKb = attrs.size()/1000.0;
 			// Campo para query por rangos
-			doc.add(new LongPoint("sizeKbNumeric", sizeKb));
+			doc.add(new DoublePoint("sizeKbNumeric", sizeKb));
 			//Campo para ver el valor del size
 			doc.add(new StringField("sizeKb", sizeKb.toString(),Field.Store.YES));
 
@@ -359,7 +360,8 @@ class WorkerThread implements Runnable {
 				StringBuilder sb = new StringBuilder();
 				for ( String line : lines )
 					sb.append(line+"\n");
-
+				//Borar último \n
+				sb.deleteCharAt(sb.length()-1);
 				String onlyTopContent = new String(sb);
 				doc.add(new TextField("onlyTopLines", onlyTopContent, Field.Store.YES));
 			}
@@ -372,7 +374,8 @@ class WorkerThread implements Runnable {
 				StringBuilder sb = new StringBuilder();
 				for ( String line : lines )
 					sb.append(line+"\n");
-
+				//Borar último \n
+				sb.deleteCharAt(sb.length()-1);
 				String onlyBottomContent = new String(sb);
 				doc.add(new TextField("onlyBottomLines", onlyBottomContent, Field.Store.YES));
 			}
