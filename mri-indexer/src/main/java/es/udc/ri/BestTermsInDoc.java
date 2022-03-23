@@ -56,7 +56,7 @@ enum Order {
 
 	abstract List<MyTerm> sortTerms(List<MyTerm> terms);
 }
-class MyTerm{
+class MyTerm {
 	private String termName;
 	private int tf;
 	private int df;
@@ -80,7 +80,7 @@ class MyTerm{
 	double getIdf()  {
 		return this.idf;
 	}
-	double getTfxidf(){
+	double getTfxidf() {
 		return this.tf * this.idf;
 	}
 }
@@ -94,12 +94,12 @@ public class BestTermsInDoc{
 		
 		String indexPath = null;
 		String outputFile = null;
-		Integer docId =null;
-		String field=null;
+		Integer docId = null;
+		String field = null;
 		//Default top 10
-		Integer top=10;
+		Integer top = 10;
 		//Default order TF
-		Order order=Order.TF;
+		Order order = Order.TF;
 
 		for ( int i = 0; i < args.length; i++ ) {
 			switch ( args[i] ) {
@@ -114,7 +114,7 @@ public class BestTermsInDoc{
 					break;
 				case "-order":
 					String order_arg = args[++i];
-					if (order_arg.equals("tf") )
+					if ( order_arg.equals("tf") )
 						order = Order.TF;
 					else if ( order_arg.equals("df") )
 						order = Order.DF;
@@ -153,25 +153,21 @@ public class BestTermsInDoc{
 			System.exit(1);
 		}
 
-		try{
-
-			//Preguntar si hace falta describir las exepciones que pueden pasar
-			//o simplemente un catch general
+		try {
 			Directory dir = FSDirectory.open(Paths.get(indexPath));
 			DirectoryReader indexReader = DirectoryReader.open(dir);
 			PrintWriter out = null;
 			
-			if(outputFile ==null){
+			if ( outputFile == null ) {
 				out = new PrintWriter(System.out);
-			}else{
-				FileWriter fw = new FileWriter(outputFile,false);
+			} else {
+				FileWriter fw = new FileWriter(outputFile, false);
 				BufferedWriter bw = new BufferedWriter(fw);
 				out = new PrintWriter(bw);
 			}
 			Terms termVector = indexReader.getTermVector(docId, field);
 
-			//Preguntar si no hay term vectors, recorrer todos los postings de los términos.
-			if (termVector == null){
+			if ( termVector == null ) {
 				System.out.println("There is no term vector in document "+docId+" for field "+field);
 				System.exit(0);
 			}
@@ -180,20 +176,19 @@ public class BestTermsInDoc{
 
 			ArrayList<MyTerm> terms = new ArrayList<>();
 			BytesRef text = null;
-			while ((text = termsEnum.next()) != null) {
+			while ( (text = termsEnum.next()) != null ) {
 				String term = text.utf8ToString();
-				int tf = (int) termsEnum.totalTermFreq();
-				int df = indexReader.docFreq(new Term(field,term));
+				int tf = (int)termsEnum.totalTermFreq();
+				int df = indexReader.docFreq(new Term(field, term));
 				int numDocs = indexReader.numDocs();
 				double idf = Math.log10((double)numDocs/(double)df);
-				terms.add(new MyTerm(term,tf,df,idf));
+				terms.add(new MyTerm(term, tf, df, idf));
 			}
 
 			List<MyTerm> sortedTerms = order.sortTerms(terms);
+			List<MyTerm> topTerms = sortedTerms.subList(0, Math.min(top, sortedTerms.size()));
 
-			List<MyTerm> topTerms = sortedTerms.subList(0,Math.min(top,sortedTerms.size()));
-
-			out.println("\nBestTermsInDoc - "+field+" (top "+Math.min(top,sortedTerms.size())+")");
+			out.println("\nBestTermsInDoc - " + field + " (top " + Math.min(top, sortedTerms.size()) + ")");
 
 			out.printf("%-77s\n", "-".repeat(77));
 
@@ -217,11 +212,9 @@ public class BestTermsInDoc{
 			dir.close();
 			indexReader.close();
 			out.close();
-		}catch (Exception e) {
+		} catch (Exception e) {
             System.err.println(" caught a " + e.getClass() + "\n with message: " + e.getMessage());
             System.exit(1);
         }
-
 	}
-
 }
