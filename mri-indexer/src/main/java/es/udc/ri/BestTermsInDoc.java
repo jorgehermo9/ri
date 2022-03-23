@@ -2,10 +2,6 @@ package es.udc.ri;
 
 import java.io.BufferedWriter;
 import java.io.FileWriter;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.io.OutputStreamWriter;
-import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -20,43 +16,42 @@ import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.util.BytesRef;
 
-enum Order{
-	TF{
+enum Order {
+	TF {
 		@Override 
-		List<MyTerm> sortTerms(List<MyTerm> terms){
-			Collections.sort(terms,(a,b)->b.getTf()-a.getTf());
+		List<MyTerm> sortTerms(List<MyTerm> terms) {
+			Collections.sort(terms, (a,b) -> b.getTf() - a.getTf());
 			return terms;
 		}
 	},
-	DF{
+	DF {
 		@Override 
-		List<MyTerm> sortTerms(List<MyTerm> terms){
-			Collections.sort(terms,(a,b)->b.getDf()-a.getDf());
+		List<MyTerm> sortTerms(List<MyTerm> terms) {
+			Collections.sort(terms, (a,b) -> b.getDf() - a.getDf());
 			return terms;
 		}
 	},
-	IDF{
+	IDF {
 		//Preguntar si ordenar esto creciente o decreciente
 		@Override 
-		List<MyTerm> sortTerms(List<MyTerm> terms){
-			Collections.sort(terms,(a,b)->Double.compare(b.getIdf(),a.getIdf()));
+		List<MyTerm> sortTerms(List<MyTerm> terms) {
+			Collections.sort(terms, (a,b) -> Double.compare(b.getIdf(), a.getIdf()));
 			return terms;
 		}
 	},
-	TFXIDF{
+	TFXIDF {
 		@Override 
-		List<MyTerm> sortTerms(List<MyTerm> terms){
-			Collections.sort(terms,(a,b)->Double.compare(b.getTfxidf(),a.getTfxidf()));
+		List<MyTerm> sortTerms(List<MyTerm> terms) {
+			Collections.sort(terms, (a,b) -> Double.compare(b.getTfxidf(), a.getTfxidf()));
 			return terms;
 		}
 	};
 
 	String orderMark(String actual){
-		if(actual.toLowerCase().equals(this.toString().toLowerCase())){
+		if ( actual.toLowerCase().equals(this.toString().toLowerCase()) )
 			return actual+"*";
-		}else{
+		else
 			return actual;
-		}
 	}
 
 	abstract List<MyTerm> sortTerms(List<MyTerm> terms);
@@ -67,22 +62,22 @@ class MyTerm{
 	private int df;
 	private double idf;
 
-	MyTerm(String termName, int tf, int df, double idf){
+	MyTerm(String termName, int tf, int df, double idf) {
 		this.termName = termName;
-		this.tf=tf;
-		this.df=df;
-		this.idf=idf;
+		this.tf = tf;
+		this.df = df;
+		this.idf = idf;
 	}
-	String getTermName(){
+	String getTermName() {
 		return this.termName;
 	}
-	int getTf(){
+	int getTf() {
 		return this.tf;
 	}
-	int getDf(){
+	int getDf() {
 		return this.df;
 	}
-	double getIdf(){
+	double getIdf()  {
 		return this.idf;
 	}
 	double getTfxidf(){
