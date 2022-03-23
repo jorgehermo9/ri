@@ -175,12 +175,12 @@ public class BestTermsInDoc{
 			TermsEnum termsEnum = termVector.iterator();
 
 			ArrayList<MyTerm> terms = new ArrayList<>();
+			int numDocs = indexReader.numDocs();
 			BytesRef text = null;
 			while ( (text = termsEnum.next()) != null ) {
 				String term = text.utf8ToString();
 				int tf = (int)termsEnum.totalTermFreq();
 				int df = indexReader.docFreq(new Term(field, term));
-				int numDocs = indexReader.numDocs();
 				double idf = Math.log10((double)numDocs/(double)df);
 				terms.add(new MyTerm(term, tf, df, idf));
 			}

@@ -19,3 +19,10 @@ mvn exec:java -Dexec.mainClass="es.udc.ri.StatsField" -Dexec.args="-index /tmp/i
 ```console
 mvn exec:java -Dexec.mainClass="es.udc.ri.WriteIndex" -Dexec.args="-index /tmp/index -outputfile file.txt"
 ```
+```console
+mvn exec:java -Dexec.mainClass="es.udc.ri.BestTermsInDoc" -Dexec.args="-index /tmp/index -docID 9 -field contentsStored -top 10 -order tf"
+```
+```console
+mvn exec:java -Dexec.mainClass="es.udc.ri.BestTermsInColl" -Dexec.args="-index /tmp/index -field contentsStored -top 10"
+```
+

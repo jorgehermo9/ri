@@ -13,12 +13,36 @@ import java.util.Collections;
 import java.util.List;
 
 import org.apache.lucene.index.DirectoryReader;
+import org.apache.lucene.index.Fields;
+import org.apache.lucene.index.MultiFields;
+import org.apache.lucene.index.MultiTerms;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.index.Terms;
 import org.apache.lucene.index.TermsEnum;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.util.BytesRef;
+
+class MyCollTerm{
+	private String termName;
+	private int df;
+	private double idf;
+
+	MyCollTerm(String termName, int df, double idf) {
+		this.termName = termName;
+		this.df = df;
+		this.idf = idf;
+	}
+	String getTermName() {
+		return this.termName;
+	}
+	int getDf() {
+		return this.df;
+	}
+	double getIdf()  {
+		return this.idf;
+	}
+}
 
 public class BestTermsInColl{
 
@@ -29,13 +53,10 @@ public class BestTermsInColl{
 		+ "[-order {tf|df|idf|tfxidf}]\n\n";
 		
 		String indexPath = null;
-		String outputFile = null;
-		Integer docId =null;
 		String field=null;
 		//Default top 10
 		Integer top=10;
-		//Default order TF
-		Order order=Order.TF;
+		boolean dfOrder = true;
 
 		for ( int i = 0; i < args.length; i++ ) {
 			switch ( args[i] ) {
@@ -45,31 +66,13 @@ public class BestTermsInColl{
 				case "-field":
 					field = args[++i];
 					break;
-				case "-outputfile":
-					outputFile = args[++i];
-					break;
-				case "-order":
-					String order_arg = args[++i];
-					if (order_arg.equals("tf") )
-						order = Order.TF;
-					else if ( order_arg.equals("df") )
-						order = Order.DF;
-					else if ( order_arg.equals("idf") )
-						order = Order.IDF;
-					else if ( order_arg.equals("tfxidf") )
-						order = Order.TFXIDF;
-					else
-						throw new IllegalArgumentException("Order not supported: " + order_arg);
-					break;
-				case "-docID":
-					docId = Integer.parseInt(args[++i]);
-					if ( docId < 0 )
-						throw new IllegalArgumentException("docID cannot be negative");
-					break;
 				case "-top":
 					top = Integer.parseInt(args[++i]);
 					if ( top < 0 )
 						throw new IllegalArgumentException("top cannot be negative");
+					break;
+				case "-rev":
+					dfOrder = false;
 					break;
 				default:
 					System.err.println("Usage: " + usage);
@@ -84,10 +87,6 @@ public class BestTermsInColl{
 			System.err.println("Must specify field. Usage: " + usage);
 			System.exit(1);
 		}
-		if ( docId == null ) {
-			System.err.println("Must specify docId. Usage: " + usage);
-			System.exit(1);
-		}
 
 		try{
 
@@ -95,9 +94,52 @@ public class BestTermsInColl{
 			//o simplemente un catch general
 			Directory dir = FSDirectory.open(Paths.get(indexPath));
 			DirectoryReader indexReader = DirectoryReader.open(dir);
-			PrintWriter out = null;
 			
-			
+			Terms indexTerms  = MultiTerms.getTerms(indexReader, field);
+
+			if ( indexTerms == null){
+				System.err.println("Error, there is no field with name: "+field);
+				System.exit(1);
+			}
+			TermsEnum termsEnum = indexTerms.iterator();
+
+			ArrayList<MyCollTerm> terms = new ArrayList<>();
+
+			int numDocs = indexReader.numDocs();
+			BytesRef text = null;
+			while ((text = termsEnum.next()) != null) {
+				String term = text.utf8ToString();
+				int df = indexReader.docFreq(new Term(field,term));
+				double idf = Math.log10((double)numDocs/(double)df);
+				terms.add(new MyCollTerm(term,df,idf));
+			}
+
+			List<MyCollTerm> sortedTerms = terms;
+			if(dfOrder){
+				Collections.sort(sortedTerms, (a,b) -> b.getDf() - a.getDf());
+			}else{
+				Collections.sort(sortedTerms, (a,b) -> Double.compare(b.getIdf(),a.getIdf()));
+			}
+
+			List<MyCollTerm> topTerms = sortedTerms.subList(0,Math.min(top, sortedTerms.size()));
+	
+			System.out.println("\nBestTermsInDoc - " + field + " (top " + Math.min(top, sortedTerms.size()) + ")");
+
+			System.out.printf("%-79s\n", "-".repeat(79));
+
+			System.out.printf("|%-50s | ", "Term");
+			System.out.printf("%-10s | ", dfOrder?"df*":"df");
+			System.out.printf("%-10s |\n", dfOrder?"idf":"idf*");
+
+			System.out.printf("%-79s\n", "-".repeat(79));
+			for ( MyCollTerm term : topTerms ) {
+				// Si no hay estadísticas para ese campo, por ejemplo, los LongPoint no indexan términos
+				System.out.printf("|%-50s | ", term.getTermName());
+				System.out.printf("%-10d | ", term.getDf());
+				System.out.printf("%-10f |\n", term.getIdf());
+			}
+			System.out.printf("%-79s\n", "-".repeat(79));
+
 		}catch (Exception e) {
             System.err.println(" caught a " + e.getClass() + "\n with message: " + e.getMessage());
             System.exit(1);
