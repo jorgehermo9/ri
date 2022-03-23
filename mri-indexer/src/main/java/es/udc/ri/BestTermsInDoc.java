@@ -191,7 +191,9 @@ public class BestTermsInDoc{
 
 			List<MyTerm> sortedTerms = order.sortTerms(terms);
 
-			out.println("\nBestTermsInDoc");
+			List<MyTerm> topTerms = sortedTerms.subList(0,Math.min(top,sortedTerms.size()));
+
+			out.println("\nBestTermsInDoc - "+field+" (top "+Math.min(top,sortedTerms.size())+")");
 
 			out.printf("%-77s\n", "-".repeat(77));
 
@@ -202,7 +204,7 @@ public class BestTermsInDoc{
 			out.printf("%-10s|\n", order.orderMark("tfxidf"));
 
 			out.printf("%-77s\n", "-".repeat(77));
-			for ( MyTerm term : sortedTerms ) {
+			for ( MyTerm term : topTerms ) {
 				// Si no hay estadísticas para ese campo, por ejemplo, los LongPoint no indexan términos
 				out.printf("|%-23s | ", term.getTermName());
 				out.printf("%-10d | ", term.getTf());
