@@ -2,23 +2,17 @@ package es.udc.ri;
 
 import java.io.BufferedWriter;
 import java.io.FileWriter;
-import java.io.IOException;
 import java.io.PrintWriter;
 import java.nio.file.Paths;
-import java.util.HashSet;
 import java.util.List;
 
 import org.apache.lucene.document.Document;
 import org.apache.lucene.index.DirectoryReader;
-import org.apache.lucene.index.FieldInfo;
-import org.apache.lucene.index.FieldInfos;
 import org.apache.lucene.index.IndexableField;
-import org.apache.lucene.search.CollectionStatistics;
-import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 
-public class WriteIndex{
+public class WriteIndex {
 	public static void main(String[] args) {
 		String usage = "java es.udc.ri.WriteIndex"
             + " [-index INDEX_PATH] [-outputfile OUTPUT_FILE] \n\n";
@@ -46,9 +40,7 @@ public class WriteIndex{
 			System.exit(1);
         }
 
-		
-
-		try(FileWriter fw = new FileWriter(outputFile,false);
+		try(FileWriter fw = new FileWriter(outputFile, false);
 			BufferedWriter bw = new BufferedWriter(fw);
 			PrintWriter out = new PrintWriter(bw)) {
 
@@ -57,33 +49,29 @@ public class WriteIndex{
 			Directory dir = FSDirectory.open(Paths.get(indexPath));
 			DirectoryReader indexReader = DirectoryReader.open(dir);
 			
-			for (int i = 0; i < indexReader.numDocs(); i++) {
-				
+			for ( int i = 0; i < indexReader.numDocs(); i++ ) {
 				Document doc = indexReader.document(i);
 				out.println("Documento " + i);
 				List<IndexableField> fields = doc.getFields();
 	
-				for (IndexableField field : fields) {
+				for ( IndexableField field : fields ) {
 					String fieldName = field.name();
 					String content = doc.get(fieldName);
 					//Aux para printear el contenido en otra línea si el contenido
 					//tiene más de una línea
 					String aux = "";
-					if(content.contains("\n")){
+					if ( content.contains("\n") )
 						aux = "\n";
-					}
 					out.println(fieldName + ": "+aux+content);
 				}
 				out.println("-".repeat(30));
-	
 			}
 
 			dir.close();
 			indexReader.close();
-		}catch (Exception e) {
+		} catch (Exception e) {
             System.err.println(" caught a " + e.getClass() + "\n with message: " + e.getMessage());
             System.exit(1);
         }
-
 	}
 }

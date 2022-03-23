@@ -274,8 +274,6 @@ class WorkerThread implements Runnable {
 		}
 	}
 
-	
-
 	private void indexDocs() throws IOException {
 		Path path = this.docsFolder;
 		if ( !Files.isDirectory(path) ) {
