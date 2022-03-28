@@ -1,29 +1,33 @@
-import java.util.ArrayList;
-import java.util.List;
+package es.udc.ri.kmeans;
+
+import org.apache.commons.math3.linear.RealVector;
 
 public class Punto {
-    private Float[] data;
-
-    public Punto(String[] strings) {
-	super();
-	List<Float> puntos = new ArrayList<Float>();
-	for (String string : strings) {
-	    puntos.add(Float.parseFloat(string));
-	}
-	this.data = puntos.toArray(new Float[strings.length]);
-    }
-
-    public Punto(Float[] data) {
+    private double[] data;
+	private Integer docId;
+	private String path;
+    public Punto(double[] data) {
 	this.data = data;
     }
+	public Punto(RealVector data,int docId,String path) {
+		this.data = data.toArray();
+		this.docId = docId;
+		this.path=path;
+	}
 
-    public float get(int dimension) {
+    public Double get(int dimension) {
 	return data[dimension];
     }
 
     public int getGrado() {
 	return data.length;
     }
+	public Integer getDocId() {
+		return this.docId;
+	}
+	public String getPath() {
+		return this.path;
+	}
 
     @Override
     public String toString() {
@@ -33,7 +37,7 @@ public class Punto {
 	    sb.append(", ");
 	    sb.append(data[i]);
 	}
-	return sb.toString();
+	return "("+sb.toString()+") => "+ (docId!=null?docId.toString():"centroide") ;
     }
 
     public Double distanciaEuclideana(Punto destino) {
