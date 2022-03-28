@@ -26,3 +26,6 @@ mvn exec:java -Dexec.mainClass="es.udc.ri.BestTermsInDoc" -Dexec.args="-index /t
 mvn exec:java -Dexec.mainClass="es.udc.ri.BestTermsInColl" -Dexec.args="-index /tmp/index -field contentsStored -top 10"
 ```
 
+```console
+mvn exec:java -Dexec.mainClass="es.udc.ri.SimilarDocs" -Dexec.args="-index /tmp/index -docID 9 -field contentsStored -top 10 -rep tf"
+```

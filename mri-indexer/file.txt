@@ -15,22 +15,6 @@ onlyTopLines:
 onlyBottomLines: 
 ------------------------------
 Documento 1
-path: /home/jorge/github/ri/docs/1/11/archivo11.txt
-contentsStored: linea1
-hostname: HUAWEI
-thread: pool-1-thread-3
-type: regular
-sizeKb: 0.007
-creationTime: 2022-03-16T12:08:47.516167Z
-lastAccessTime: 2022-03-23T12:04:40.362351Z
-lastModifiedTime: 2022-03-16T12:08:47.516167Z
-creationTimeLucene: 20220316120847516
-lastAccessTimeLucene: 20220323120440362
-lastModifiedTimeLucene: 20220316120847516
-onlyTopLines: linea1
-onlyBottomLines: linea1
-------------------------------
-Documento 2
 path: /home/jorge/github/ri/docs/3/archivo3.txt
 contentsStored: 
 hostname: HUAWEI
@@ -45,6 +29,22 @@ lastAccessTimeLucene: 20220323120440168
 lastModifiedTimeLucene: 20220316120847516
 onlyTopLines: 
 onlyBottomLines: 
+------------------------------
+Documento 2
+path: /home/jorge/github/ri/docs/2/archivo25.txt
+contentsStored: linea8
+hostname: HUAWEI
+thread: pool-1-thread-2
+type: regular
+sizeKb: 0.007
+creationTime: 2022-03-16T19:38:42.883313Z
+lastAccessTime: 2022-03-23T12:04:40.178981Z
+lastModifiedTime: 2022-03-16T19:38:42.883313Z
+creationTimeLucene: 20220316193842883
+lastAccessTimeLucene: 20220323120440178
+lastModifiedTimeLucene: 20220316193842883
+onlyTopLines: linea8
+onlyBottomLines: linea8
 ------------------------------
 Documento 3
 path: /home/jorge/github/ri/docs/2/archivo26.txt
@@ -187,18 +187,18 @@ linea7
 linea8
 ------------------------------
 Documento 10
-path: /home/jorge/github/ri/docs/2/archivo25.txt
-contentsStored: linea8
+path: /home/jorge/github/ri/docs/1/11/archivo11.txt
+contentsStored: linea1
 hostname: HUAWEI
-thread: pool-1-thread-2
+thread: pool-1-thread-3
 type: regular
 sizeKb: 0.007
-creationTime: 2022-03-16T19:38:42.883313Z
-lastAccessTime: 2022-03-23T12:04:40.178981Z
-lastModifiedTime: 2022-03-16T19:38:42.883313Z
-creationTimeLucene: 20220316193842883
-lastAccessTimeLucene: 20220323120440178
-lastModifiedTimeLucene: 20220316193842883
-onlyTopLines: linea8
-onlyBottomLines: linea8
+creationTime: 2022-03-16T12:08:47.516167Z
+lastAccessTime: 2022-03-23T12:04:40.362351Z
+lastModifiedTime: 2022-03-16T12:08:47.516167Z
+creationTimeLucene: 20220316120847516
+lastAccessTimeLucene: 20220323120440362
+lastModifiedTimeLucene: 20220316120847516
+onlyTopLines: linea1
+onlyBottomLines: linea1
 ------------------------------
