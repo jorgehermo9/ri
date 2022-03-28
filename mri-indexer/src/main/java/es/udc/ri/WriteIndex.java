@@ -49,7 +49,8 @@ public class WriteIndex {
 			Directory dir = FSDirectory.open(Paths.get(indexPath));
 			DirectoryReader indexReader = DirectoryReader.open(dir);
 			
-			for ( int i = 0; i < indexReader.numDocs(); i++ ) {
+			int numDocs = indexReader.numDocs();
+			for ( int i = 0; i < numDocs; i++ ) {
 				Document doc = indexReader.document(i);
 				out.println("Documento " + i);
 				List<IndexableField> fields = doc.getFields();
