@@ -47,7 +47,7 @@ enum Order {
 		}
 	};
 
-	String orderMark(String actual){
+	String orderMark(String actual) {
 		if ( actual.toLowerCase().equals(this.toString().toLowerCase()) )
 			return actual+"*";
 		else
@@ -84,9 +84,8 @@ class MyTerm {
 		return this.tf * this.idf;
 	}
 }
-public class BestTermsInDoc{
-
-    public static void main(String[] args) {
+public class BestTermsInDoc {
+	public static void main(String[] args) {
 	
 		String usage = "java es.udc.ri.BestTermsInDoc"
 		+ " [-index INDEX_PATH] [-docID ID] [-field FIELD] [-top N] \n"
@@ -96,9 +95,9 @@ public class BestTermsInDoc{
 		String outputFile = null;
 		Integer docId = null;
 		String field = null;
-		//Default top 10
+		// Default top 10
 		Integer top = 10;
-		//Default order TF
+		// Default order TF
 		Order order = Order.TF;
 
 		for ( int i = 0; i < args.length; i++ ) {
@@ -213,8 +212,8 @@ public class BestTermsInDoc{
 			indexReader.close();
 			out.close();
 		} catch (Exception e) {
-            System.err.println(" caught a " + e.getClass() + "\n with message: " + e.getMessage());
-            System.exit(1);
-        }
+			System.err.println(" caught a " + e.getClass() + "\n with message: " + e.getMessage());
+			System.exit(1);
+		}
 	}
 }

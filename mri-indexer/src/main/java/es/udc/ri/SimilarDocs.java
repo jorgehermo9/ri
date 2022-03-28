@@ -4,10 +4,12 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Set;
 
 import org.apache.commons.math3.linear.ArrayRealVector;
 import org.apache.commons.math3.linear.RealVector;
+import org.apache.lucene.document.Document;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.index.Terms;
@@ -19,10 +21,10 @@ import org.apache.lucene.util.BytesRef;
 enum Representation {
 	tf {
 		@Override 
-		RealVector getVector(HashMap<String,MyTermInfo> termInfos,Set<String> allTerms) {
+		RealVector getVector(HashMap<String,MyTermInfo> termInfos, Set<String> allTerms) {
 			RealVector vector = new ArrayRealVector(allTerms.size());
 			int i = 0;
-			for (String term : allTerms) {
+			for ( String term : allTerms ) {
 				int value = termInfos.containsKey(term) ? termInfos.get(term).getTf() : 0;
 				vector.setEntry(i++, value);
 			}
@@ -31,10 +33,10 @@ enum Representation {
 	},
 	bin {
 		@Override 
-		RealVector getVector(HashMap<String,MyTermInfo> termInfos,Set<String> allTerms) {
+		RealVector getVector(HashMap<String,MyTermInfo> termInfos, Set<String> allTerms) {
 			RealVector vector = new ArrayRealVector(allTerms.size());
 			int i = 0;
-			for (String term : allTerms) {
+			for ( String term : allTerms ) {
 				int value = termInfos.containsKey(term) ? 1 : 0;
 				vector.setEntry(i++, value);
 			}
@@ -43,11 +45,11 @@ enum Representation {
 	},
 	tfxidf {
 		@Override 
-		RealVector getVector(HashMap<String,MyTermInfo> termInfos,Set<String> allTerms) {
+		RealVector getVector(HashMap<String,MyTermInfo> termInfos, Set<String> allTerms) {
 			RealVector vector = new ArrayRealVector(allTerms.size());
 			int i = 0;
-			for (String term : allTerms) {
-				double value = termInfos.containsKey(term) ? termInfos.get(term).getTfxidf()  : 0;
+			for ( String term : allTerms ) {
+				double value = termInfos.containsKey(term) ? termInfos.get(term).getTfxidf() : 0;
 				vector.setEntry(i++, value);
 			}
 			return vector;
@@ -75,7 +77,6 @@ class MyTermInfo {
 	double getTfxidf() {
 		return this.tf * this.idf;
 	}
-
 }
 
 class DocSimilarity{
@@ -92,15 +93,11 @@ class DocSimilarity{
 	double getSimilarity(){
 		return this.similarity;
 	}
-	@Override
-	public String toString(){
-		return "("+docId+","+similarity+")";
-	}
 }
 
 public class SimilarDocs{
 
-    public static void main(String[] args) {
+	public static void main(String[] args) {
 	
 		String usage = "java es.udc.ri.SimilarDocs"
 		+ " [-index INDEX_PATH] [-docID ID] [-field FIELD] [-top N] \n"
@@ -162,11 +159,9 @@ public class SimilarDocs{
 		}
 
 		// No hay garantía de que el HashSet mantenga el orden en consecutivas
-		//llamadas del iterator (ver https://docs.oracle.com/javase/7/docs/api/java/util/HashSet.html)
-
+		// llamadas del iterator (ver https://docs.oracle.com/javase/7/docs/api/java/util/HashSet.html)
 		LinkedHashSet<String> allTerms = new LinkedHashSet<String>();
 		HashMap<Integer,HashMap<String,MyTermInfo>> allDocsTerms = new HashMap<>();
-
 		try {
 			Directory dir = FSDirectory.open(Paths.get(indexPath));
 			DirectoryReader indexReader = DirectoryReader.open(dir);
@@ -177,68 +172,75 @@ public class SimilarDocs{
 			// 	if (liveDocs != null && !liveDocs.get(i))
 			// 		continue;
 
-			// Document doc = reader.document(i);
+			int numDocs = indexReader.numDocs();
 
-			for ( int docId = 0; docId < indexReader.numDocs(); docId++ ) {
+			for ( int docId = 0; docId < numDocs; docId++ ) {
 				Terms termVector = indexReader.getTermVector(docId, field);
 				if ( termVector == null ) {
-					if(docId == targetDocId){
+					if ( docId == targetDocId ) {
 						System.err.println("There is no term vector in target Doc. Exiting...");
 						System.exit(1);
-					}else{
-						System.err.println("There is no term vector in document "+docId+" for field "+field);
+					} else {
+						System.err.println("There is no term vector in document " + docId + " for field " + field);
 						continue;
 					}
 				}
-				TermsEnum termsEnum = termVector.iterator();
-
-				HashMap<String,MyTermInfo> termInfos = new HashMap<>();
-
-				int numDocs = indexReader.numDocs();
+				HashMap<String, MyTermInfo> termInfos = new HashMap<>();
 				BytesRef text = null;
+				TermsEnum termsEnum = termVector.iterator();
 				while ( (text = termsEnum.next()) != null ) {
 					String term = text.utf8ToString();
 					int tf = (int)termsEnum.totalTermFreq();
 					int df = indexReader.docFreq(new Term(field, term));
 					double idf = Math.log10((double)numDocs/(double)df);
-					termInfos.put(term,new MyTermInfo(term, tf, idf));
+
+					termInfos.put(term, new MyTermInfo(term, tf, idf));
 					allTerms.add(term);
 				}
-				allDocsTerms.put(docId,termInfos);
-
+				allDocsTerms.put(docId, termInfos);
 			}
 
 			ArrayList<DocSimilarity> allDocsSimilarity = new ArrayList<>();
 			RealVector targetVector = rep.getVector(allDocsTerms.get(targetDocId), allTerms);
-			for ( int docId = 0; docId < indexReader.numDocs(); docId++ ) {
-				if (!allDocsTerms.containsKey(docId) || docId ==targetDocId){
-					//Si el campo en el docId no tenía term vector o si es el targetDocId
+			for ( int docId = 0; docId < numDocs; docId++ ) {
+				if ( !allDocsTerms.containsKey(docId) || docId == targetDocId ) {
+					// Si el campo en el docId no tenía term vector o si es el targetDocId
 					continue;
 				}
 				RealVector docVector = rep.getVector(allDocsTerms.get(docId), allTerms);
-				allDocsSimilarity.add(new DocSimilarity(docId,getCosineSimilarity(targetVector,docVector)));
+				allDocsSimilarity.add(new DocSimilarity(docId, getCosineSimilarity(targetVector, docVector)));
 			}
-
-
 			
-			allDocsSimilarity.sort((doc1,doc2) -> Double.compare(doc2.getSimilarity(),doc1.getSimilarity()));
-			
+			allDocsSimilarity.sort((doc1, doc2) -> Double.compare(doc2.getSimilarity(), doc1.getSimilarity()));
+			List<DocSimilarity> topSimilarity = allDocsSimilarity.subList(0, Math.min(top, allDocsSimilarity.size()));
 
-			System.out.println();
-			System.out.println("Representation: "+rep+"\n");
-			int toShow = Math.min(top,allDocsSimilarity.size());
-			for( int i = 0; i < toShow; i++){
-				DocSimilarity doc = allDocsSimilarity.get(i);
-				System.out.println((i+1)+". "+"docId "+doc.getDocId()+": "+doc.getSimilarity());
+			System.out.println("\nSimilarDocs (top " + Math.min(top, allDocsSimilarity.size()) + ")");
+			System.out.printf("%-91s\n", "-".repeat(91));
+			System.out.printf("|%-4s | ", "N");
+			System.out.printf("%-7s | ", "DocId");
+			System.out.printf("%-18s | ", "Similarity (" + rep + ")");
+			System.out.printf("%-50s | \n", "Path");
+
+			System.out.printf("%-91s\n", "-".repeat(91));
+			int num = 1;
+			for ( DocSimilarity doc : topSimilarity ) {
+				Document d = indexReader.document(doc.getDocId());
+				String path = d.get("path");
+
+				System.out.printf("|%-4s | ", num + "°");
+				System.out.printf("%-7d | ", doc.getDocId());
+				System.out.printf("%-18f | ", doc.getSimilarity());
+				System.out.printf("%-50s | \n", path);
+				num++;
 			}
-
+			System.out.printf("%-91s\n", "-".repeat(91));
 
 			dir.close();
 			indexReader.close();
 		} catch (Exception e) {
-            System.err.println(" caught a " + e.getClass() + "\n with message: " + e.getMessage());
-            System.exit(1);
-        }
+			System.err.println(" caught a " + e.getClass() + "\n with message: " + e.getMessage());
+			System.exit(1);
+		}
 	}
 
 	static double getCosineSimilarity(RealVector v1,RealVector v2) {

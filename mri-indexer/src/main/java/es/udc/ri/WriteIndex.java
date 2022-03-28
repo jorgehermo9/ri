@@ -15,30 +15,30 @@ import org.apache.lucene.store.FSDirectory;
 public class WriteIndex {
 	public static void main(String[] args) {
 		String usage = "java es.udc.ri.WriteIndex"
-            + " [-index INDEX_PATH] [-outputfile OUTPUT_FILE] \n\n";
+			+ " [-index INDEX_PATH] [-outputfile OUTPUT_FILE] \n\n";
 		String indexPath = null;
 		String outputFile = null;
 		for ( int i = 0; i < args.length; i++ ) {
-            switch ( args[i] ) {
-                case "-index":
-                    indexPath = args[++i];
-                    break;
-                case "-outputfile":
-                    outputFile = args[++i];
-                    break;
-                default:
-                    System.err.println("Usage: " + usage);
-                    throw new IllegalArgumentException("unknown parameter " + args[i]);
-            }
-        }
+			switch ( args[i] ) {
+				case "-index":
+					indexPath = args[++i];
+					break;
+				case "-outputfile":
+					outputFile = args[++i];
+					break;
+				default:
+					System.err.println("Usage: " + usage);
+					throw new IllegalArgumentException("unknown parameter " + args[i]);
+			}
+		}
 		if ( indexPath == null ) {
 			System.err.println("Must specify index path. Usage: " + usage);
 			System.exit(1);
-        }
+		}
 		if ( outputFile == null ) {
 			System.err.println("Must specify output file. Usage: " + usage);
 			System.exit(1);
-        }
+		}
 
 		try(FileWriter fw = new FileWriter(outputFile, false);
 			BufferedWriter bw = new BufferedWriter(fw);
@@ -71,8 +71,8 @@ public class WriteIndex {
 			dir.close();
 			indexReader.close();
 		} catch (Exception e) {
-            System.err.println(" caught a " + e.getClass() + "\n with message: " + e.getMessage());
-            System.exit(1);
-        }
+			System.err.println(" caught a " + e.getClass() + "\n with message: " + e.getMessage());
+			System.exit(1);
+		}
 	}
 }
