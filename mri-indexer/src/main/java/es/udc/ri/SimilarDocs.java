@@ -215,25 +215,21 @@ public class SimilarDocs{
 			List<DocSimilarity> topSimilarity = allDocsSimilarity.subList(0, Math.min(top, allDocsSimilarity.size()));
 
 			System.out.println("\nSimilarDocs (top " + Math.min(top, allDocsSimilarity.size()) + ")");
-			System.out.printf("%-91s\n", "-".repeat(91));
-			System.out.printf("|%-4s | ", "N");
-			System.out.printf("%-7s | ", "DocId");
+			System.out.printf("%-125s\n", "-".repeat(125));
+			System.out.printf("| %-7s | ", "DocId");
 			System.out.printf("%-18s | ", "Similarity (" + rep + ")");
-			System.out.printf("%-50s | \n", "Path");
+			System.out.printf("%-90s | \n", "Path");
 
-			System.out.printf("%-91s\n", "-".repeat(91));
-			int num = 1;
+			System.out.printf("%-125s\n", "-".repeat(125));
 			for ( DocSimilarity doc : topSimilarity ) {
 				Document d = indexReader.document(doc.getDocId());
 				String path = d.get("path");
 
-				System.out.printf("|%-4s | ", num + "°");
-				System.out.printf("%-7d | ", doc.getDocId());
+				System.out.printf("| %-7d | ", doc.getDocId());
 				System.out.printf("%-18f | ", doc.getSimilarity());
-				System.out.printf("%-50s | \n", path);
-				num++;
+				System.out.printf("%-90s | \n", path);
 			}
-			System.out.printf("%-91s\n", "-".repeat(91));
+			System.out.printf("%-125s\n", "-".repeat(125));
 
 			dir.close();
 			indexReader.close();
