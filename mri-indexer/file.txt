@@ -1,204 +1,4746 @@
 Documento 0
-path: /home/jorge/github/ri/docs/root.txt
+path: /home/jorge/apuntes/current/ri/practicas/ri-mvn/src/main/java/simpleindexing/SimpleThreadPool1.java
 contentsStored: 
+package simpleindexing;
+
+import java.io.IOException;
+import java.nio.file.DirectoryStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+
+/**
+ * The Class SimpleThreadPool1 prints the name of each subfolder using a
+ * different thread.
+ */
+public class SimpleThreadPool1 {
+
+	/**
+	 * This Runnable takes a folder and prints its path.
+	 */
+	public static class WorkerThread implements Runnable {
+
+		private final Path folder;
+
+		public WorkerThread(final Path folder) {
+			this.folder = folder;
+		}
+
+		/**
+		 * This is the work that the current thread will do when processed by the pool.
+		 * In this case, it will only print some information.
+		 */
+		@Override
+		public void run() {
+			System.out.println(String.format("I am the thread '%s' and I am responsible for folder '%s'",
+					Thread.currentThread().getName(), folder));
+		}
+
+	}
+
+	public static void main(final String[] args) {
+
+		if (args.length != 1) {
+			System.out.println("Usage: java SimpleThreadPool1 folder");
+			return;
+		}
+
+		/*
+		 * Create a ExecutorService (ThreadPool is a subclass of ExecutorService) with
+		 * so many thread as cores in my machine. This can be tuned according to the
+		 * resources needed by the threads.
+		 */
+		final int numCores = Runtime.getRuntime().availableProcessors();
+		final ExecutorService executor = Executors.newFixedThreadPool(numCores);
+
+		/*
+		 * We use Java 7 NIO.2 methods for input/output management. More info in:
+		 * http://docs.oracle.com/javase/tutorial/essential/io/fileio.html
+		 *
+		 * We also use Java 7 try-with-resources syntax. More info in:
+		 * https://docs.oracle.com/javase/tutorial/essential/exceptions/
+		 * tryResourceClose.html
+		 */
+		try (DirectoryStream<Path> directoryStream = Files.newDirectoryStream(Paths.get(args[0]))) {
+
+			/* We process each subfolder in a new thread. */
+			for (final Path path : directoryStream) {
+				if (Files.isDirectory(path)) {
+					final Runnable worker = new WorkerThread(path);
+					/*
+					 * Send the thread to the ThreadPool. It will be processed eventually.
+					 */
+					executor.execute(worker);
+				}
+			}
+
+		} catch (final IOException e) {
+			e.printStackTrace();
+			System.exit(-1);
+		}
+
+		/*
+		 * Close the ThreadPool; no more jobs will be accepted, but all the previously
+		 * submitted jobs will be processed.
+		 */
+		executor.shutdown();
+
+		/* Wait up to 1 hour to finish all the previously submitted jobs */
+		try {
+			executor.awaitTermination(1, TimeUnit.HOURS);
+		} catch (final InterruptedException e) {
+			e.printStackTrace();
+			System.exit(-2);
+		}
+
+		System.out.println("Finished all threads");
+
+	}
+
+}
 hostname: HUAWEI
-thread: pool-1-thread-4
+thread: pool-1-thread-3
 type: regular
-sizeKb: 0.0
-creationTime: 2022-03-16T12:08:47.516167Z
-lastAccessTime: 2022-03-23T12:04:40.168979Z
-lastModifiedTime: 2022-03-16T12:08:47.516167Z
-creationTimeLucene: 20220316120847516
-lastAccessTimeLucene: 20220323120440168
-lastModifiedTimeLucene: 20220316120847516
+sizeKb: 2.749
+creationTime: 2022-02-03T15:30:52.415779Z
+lastAccessTime: 2022-03-27T20:20:34.743014Z
+lastModifiedTime: 2022-02-03T15:30:52.415779Z
+creationTimeLucene: 20220203153052415
+lastAccessTimeLucene: 20220327202034743
+lastModifiedTimeLucene: 20220203153052415
 onlyTopLines: 
+package simpleindexing;
+
+import java.io.IOException;
+import java.nio.file.DirectoryStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 onlyBottomLines: 
+
+}
 ------------------------------
 Documento 1
-path: /home/jorge/github/ri/docs/3/archivo3.txt
+path: /home/jorge/apuntes/current/ri/practicas/ri-mvn/src/main/java/simpleindexing/SimpleReader2.java
 contentsStored: 
+package simpleindexing;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Paths;
+
+import org.apache.lucene.document.Document;
+import org.apache.lucene.index.CorruptIndexException;
+import org.apache.lucene.index.DirectoryReader;
+import org.apache.lucene.index.LeafReader;
+import org.apache.lucene.index.LeafReaderContext;
+import org.apache.lucene.index.PostingsEnum;
+import org.apache.lucene.index.Term;
+import org.apache.lucene.index.Terms;
+import org.apache.lucene.index.TermsEnum;
+import org.apache.lucene.store.Directory;
+import org.apache.lucene.store.FSDirectory;
+
+public class SimpleReader2 {
+
+	/**
+	 * Los índices de Lucene se almacenan en forma de segmentos, cada segmento se
+	 * considera una hoja (leaf) del índice. Este ejemplo lee los contenidos de un
+	 * índice usando AtomicReaders. Un AtomicReader lee los contenidos de un
+	 * segmento o leaf.
+	 * 
+	 * IndexReader instances for indexes on disk are usually constructed with a call
+	 * to one of the static DirectoryReader.open() methods, e.g.
+	 * DirectoryReader.open(Directory). DirectoryReader implements the
+	 * CompositeReader interface, it is not possible to directly get postings.
+	 * 
+	 * LeafReader: These indexes do not consist of several sub-readers, they are
+	 * atomic. They support retrieval of stored fields, doc values, terms, and
+	 * postings.
+	 *
+	 * Si nuestro índice es pequeño solamente tendrá un segmento por lo que la
+	 * llamada indexReader.getContext().leaves() nos dará una lista con un único
+	 * LeafReaderContext (objeto del cual se obtiene el LeafReader).
+	 */
+	public static void main(final String[] args) throws IOException {
+
+		if (args.length != 2) {
+			System.out.println("Usage: java SimpleReader2 <index_folder> <field_name>");
+			return;
+		}
+
+		Directory dir = null;
+		DirectoryReader indexReader = null;
+
+		BufferedReader in;
+
+		in = new BufferedReader(new InputStreamReader(System.in, StandardCharsets.UTF_8));
+
+		try {
+			dir = FSDirectory.open(Paths.get(args[0]));
+			indexReader = DirectoryReader.open(dir);
+		} catch (CorruptIndexException e1) {
+			System.out.println("Graceful message: exception " + e1);
+			e1.printStackTrace();
+		} catch (IOException e1) {
+			System.out.println("Graceful message: exception " + e1);
+			e1.printStackTrace();
+		}
+
+		// Get the context for each leaf (segment)
+
+		/**
+		 * We can do for (final LeafReaderContext leaf :
+		 * indexReader.getContext().leaves()) { or ---
+		 */
+
+		System.out.println("Size of  indexReader.leaves() = " + indexReader.leaves().size());
+
+		for (final LeafReaderContext leaf : indexReader.leaves()) {
+			// Print leaf number (starting from zero)
+			System.out.println("We are in the leaf number " + leaf.ord);
+
+			// Create an AtomicReader for each leaf
+			// (using, again, Java 7 try-with-resources syntax)
+			try (LeafReader leafReader = leaf.reader()) {
+
+				String field = args[1];
+
+				System.out.println("Field = " + field);
+				final Terms terms = leafReader.terms(field);
+				final TermsEnum termsEnum = terms.iterator();
+
+				while (termsEnum.next() != null) {
+					final String tt = termsEnum.term().utf8ToString();
+					// totalFreq equals -1 if the value was not
+					// stored in the codification of this index
+					System.out.println("\t" + tt + "\ttotalFreq()=" + termsEnum.totalTermFreq() + "\tdocFreq="
+							+ termsEnum.docFreq());
+
+				}
+
+				System.out.println("Enter input: ");
+
+				try {
+					in.readLine();
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+
+				int doc;
+				final Term term = new Term("modelDescription", "probability");
+				final PostingsEnum postingsEnum = leafReader.postings(term);
+
+				while ((doc = postingsEnum.nextDoc()) != PostingsEnum.NO_MORE_DOCS) {
+					System.out.println("\nTerm(field=modelDescription, text=probability)" + " appears in doc num: "
+							+ doc + " with term frequency= " + postingsEnum.freq());
+					final Document d = leafReader.document(doc);
+					System.out.println("modelDescription = " + d.get("modelDescription"));
+				}
+
+			}
+		}
+
+	}
+
+}
 hostname: HUAWEI
-thread: pool-1-thread-1
+thread: pool-1-thread-3
 type: regular
-sizeKb: 0.0
-creationTime: 2022-03-16T12:08:47.516167Z
-lastAccessTime: 2022-03-23T12:04:40.168979Z
-lastModifiedTime: 2022-03-16T12:08:47.516167Z
-creationTimeLucene: 20220316120847516
-lastAccessTimeLucene: 20220323120440168
-lastModifiedTimeLucene: 20220316120847516
+sizeKb: 4.149
+creationTime: 2022-02-03T15:30:52.415779Z
+lastAccessTime: 2022-03-27T20:20:34.733016Z
+lastModifiedTime: 2022-02-03T15:30:52.415779Z
+creationTimeLucene: 20220203153052415
+lastAccessTimeLucene: 20220327202034733
+lastModifiedTimeLucene: 20220203153052415
 onlyTopLines: 
+package simpleindexing;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Paths;
 onlyBottomLines: 
+
+}
 ------------------------------
 Documento 2
-path: /home/jorge/github/ri/docs/2/archivo25.txt
-contentsStored: linea8
+path: /home/jorge/apuntes/current/ri/practicas/ri-mvn/src/main/java/simpleindexing/SimpleReader4.java
+contentsStored: 
+package simpleindexing;
+
+import java.io.IOException;
+import java.nio.file.Paths;
+
+import org.apache.lucene.index.CorruptIndexException;
+import org.apache.lucene.index.DirectoryReader;
+import org.apache.lucene.index.FieldInfo;
+import org.apache.lucene.index.FieldInfos;
+import org.apache.lucene.index.MultiTerms;
+import org.apache.lucene.index.PostingsEnum;
+import org.apache.lucene.index.Terms;
+import org.apache.lucene.index.TermsEnum;
+import org.apache.lucene.store.Directory;
+import org.apache.lucene.store.FSDirectory;
+import org.apache.lucene.util.BytesRef;
+
+public class SimpleReader4 {
+
+	/**
+	 * 
+	 * With FieldInfos and MultiTerms classes we get access to the fields, terms and
+	 * postings for an index reader without accessing the leaves.
+	 * 
+	 * 
+	 * Accessing the atomic leaves as it is shown in previous examples is faster.
+	 * 
+	 * These APIs are experimental and might change in incompatible ways in the next
+	 * release.
+	 * 
+	 * In fact these functionalities were implemented in the MultiFields class in
+	 * Lucene 7.x
+	 */
+
+	public static void main(final String[] args) throws IOException {
+
+		if (args.length != 1) {
+			System.out.println("Usage: java SimpleReader4 <index_folder>");
+			return;
+		}
+
+		Directory dir = null;
+		DirectoryReader indexReader = null;
+
+		try {
+			dir = FSDirectory.open(Paths.get(args[0]));
+			indexReader = DirectoryReader.open(dir);
+		} catch (CorruptIndexException e1) {
+			System.out.println("Graceful message: exception " + e1);
+			e1.printStackTrace();
+		} catch (IOException e1) {
+			System.out.println("Graceful message: exception " + e1);
+			e1.printStackTrace();
+		}
+
+		System.out.printf("%-20s%-10s%-25s%-10s%-80s\n", "TERM", "DOCID", "FIELD", "FREQ",
+				"POSITIONS (-1 means No Positions indexed for this field)");
+
+		final FieldInfos fieldinfos = FieldInfos.getMergedFieldInfos(indexReader);
+
+		for (final FieldInfo fieldinfo : fieldinfos) {
+
+			System.out.println("Field = " + fieldinfo.name);
+			final Terms terms = MultiTerms.getTerms(indexReader, fieldinfo.name);
+			if (terms != null) {
+				final TermsEnum termsEnum = terms.iterator();
+
+				while (termsEnum.next() != null) {
+
+					String termString = termsEnum.term().utf8ToString();
+
+					PostingsEnum posting = MultiTerms.getTermPostingsEnum(indexReader, fieldinfo.name,
+							new BytesRef(termString));
+
+					if (posting != null) { // if the term does not appear in any document, the posting object may be
+											// null
+						int docid;
+						// Each time you call posting.nextDoc(), it moves the cursor of the posting list
+						// to the next position
+						// and returns the docid of the current entry (document). Note that this is an
+						// internal Lucene docid.
+						// It returns PostingsEnum.NO_MORE_DOCS if you have reached the end of the
+						// posting list.
+						while ((docid = posting.nextDoc()) != PostingsEnum.NO_MORE_DOCS) {
+							int freq = posting.freq(); // get the frequency of the term in the current document
+							System.out.printf("%-20s%-10d%-25s%-10d", termString, docid, fieldinfo.name, freq);
+							for (int i = 0; i < freq; i++) {
+								// Get the next occurrence position of the term in the current document.
+								// Note that you need to make sure by yourself that you at most call this
+								// function freq() times.
+								System.out.print((i > 0 ? "," : "") + posting.nextPosition());
+							}
+							System.out.println();
+						}
+					}
+
+				}
+
+			}
+		}
+
+		try {
+			indexReader.close();
+			dir.close();
+		} catch (IOException e) {
+			System.out.println("Graceful message: exception " + e);
+			e.printStackTrace();
+		}
+
+	}
+
+}
 hostname: HUAWEI
-thread: pool-1-thread-2
+thread: pool-1-thread-3
 type: regular
-sizeKb: 0.007
-creationTime: 2022-03-16T19:38:42.883313Z
-lastAccessTime: 2022-03-23T12:04:40.178981Z
-lastModifiedTime: 2022-03-16T19:38:42.883313Z
-creationTimeLucene: 20220316193842883
-lastAccessTimeLucene: 20220323120440178
-lastModifiedTimeLucene: 20220316193842883
-onlyTopLines: linea8
-onlyBottomLines: linea8
+sizeKb: 3.605
+creationTime: 2022-02-03T15:30:52.415779Z
+lastAccessTime: 2022-03-27T20:20:34.736349Z
+lastModifiedTime: 2022-02-03T15:30:52.415779Z
+creationTimeLucene: 20220203153052415
+lastAccessTimeLucene: 20220327202034736
+lastModifiedTimeLucene: 20220203153052415
+onlyTopLines: 
+package simpleindexing;
+
+import java.io.IOException;
+import java.nio.file.Paths;
+
+import org.apache.lucene.index.CorruptIndexException;
+import org.apache.lucene.index.DirectoryReader;
+onlyBottomLines: 
+
+}
 ------------------------------
 Documento 3
-path: /home/jorge/github/ri/docs/2/archivo26.txt
-contentsStored: linea8
+path: /home/jorge/apuntes/current/ri/practicas/ri-mvn/src/main/java/simpleindexing/SimpleReader1.java
+contentsStored: 
+package simpleindexing;
+
+import java.io.IOException;
+import java.nio.file.Paths;
+import java.util.List;
+
+import org.apache.lucene.document.Document;
+import org.apache.lucene.index.CorruptIndexException;
+import org.apache.lucene.index.DirectoryReader;
+import org.apache.lucene.index.IndexableField;
+import org.apache.lucene.index.Term;
+import org.apache.lucene.store.Directory;
+import org.apache.lucene.store.FSDirectory;
+
+public class SimpleReader1 {
+
+	/**
+	 * Project testlucene9_0_0 SimpleReader1 class reads the index SimpleIndex
+	 * created with the SimpleIndexing class
+	 */
+	public static void main(String[] args) {
+
+		if (args.length != 1) {
+			System.out.println("Usage: java SimpleReader1 SimpleIndex");
+			return;
+		}
+		// SimpleIndex is the folder where the index SimpleIndex is stored
+
+		String indexFolder = args[0];
+
+		Directory dir = null;
+		DirectoryReader indexReader = null;
+		Document doc = null;
+
+		List<IndexableField> fields = null;
+
+		try {
+			dir = FSDirectory.open(Paths.get(indexFolder));
+			indexReader = DirectoryReader.open(dir);
+		} catch (CorruptIndexException e1) {
+			System.out.println("Graceful message: exception " + e1);
+			e1.printStackTrace();
+		} catch (IOException e1) {
+			System.out.println("Graceful message: exception " + e1);
+			e1.printStackTrace();
+		}
+
+		for (int i = 0; i < indexReader.numDocs(); i++) {
+
+			try {
+				doc = indexReader.document(i);
+			} catch (CorruptIndexException e1) {
+				System.out.println("Graceful message: exception " + e1);
+				e1.printStackTrace();
+			} catch (IOException e1) {
+				System.out.println("Graceful message: exception " + e1);
+				e1.printStackTrace();
+			}
+			System.out.println("Documento " + i);
+			System.out.println("modelRef = " + doc.get("modelRef"));
+			System.out.println("modelAcronym = " + doc.get("modelAcronym"));
+			System.out.println("modelDescription = " + doc.get("modelDescription"));
+			System.out.println("theoreticalContent = " + doc.get("theoreticalContent"));
+			System.out.println("storedtheoreticalContent = " + doc.get("storedtheoreticalContent"));
+			System.out.println("practicalContent = " + doc.get("practicalContent"));
+		}
+
+		/**
+		 * Note doc.get() returns null for the fields that were not stored
+		 */
+
+		for (int i = 0; i < indexReader.numDocs(); i++) {
+
+			try {
+				doc = indexReader.document(i);
+			} catch (CorruptIndexException e1) {
+				System.out.println("Graceful message: exception " + e1);
+				e1.printStackTrace();
+			} catch (IOException e1) {
+				System.out.println("Graceful message: exception " + e1);
+				e1.printStackTrace();
+			}
+
+			System.out.println("Documento " + i);
+
+			fields = doc.getFields();
+			// Note doc.getFields() gets the stored fields
+
+			for (IndexableField field : fields) {
+				String fieldName = field.name();
+				System.out.println(fieldName + ": " + doc.get(fieldName));
+
+			}
+
+		}
+
+		final Term term = new Term("modelDescription", "model");
+		try {
+			System.out.println("\nTerm(field=modelDescription, text=model)" + "doc frequency= "
+					+ indexReader.docFreq(term) + "total term frequency= " + indexReader.totalTermFreq(term));
+		} catch (IOException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
+
+		try {
+			indexReader.close();
+			dir.close();
+		} catch (IOException e) {
+			System.out.println("Graceful message: exception " + e);
+			e.printStackTrace();
+		}
+
+	}
+}
 hostname: HUAWEI
-thread: pool-1-thread-2
+thread: pool-1-thread-3
 type: regular
-sizeKb: 0.007
-creationTime: 2022-03-16T19:38:45.596604Z
-lastAccessTime: 2022-03-23T12:04:40.362351Z
-lastModifiedTime: 2022-03-16T19:38:45.596604Z
-creationTimeLucene: 20220316193845596
-lastAccessTimeLucene: 20220323120440362
-lastModifiedTimeLucene: 20220316193845596
-onlyTopLines: linea8
-onlyBottomLines: linea8
+sizeKb: 3.365
+creationTime: 2022-03-16T12:28:41.297287Z
+lastAccessTime: 2022-03-27T20:20:34.733016Z
+lastModifiedTime: 2022-03-16T12:28:41.297287Z
+creationTimeLucene: 20220316122841297
+lastAccessTimeLucene: 20220327202034733
+lastModifiedTimeLucene: 20220316122841297
+onlyTopLines: 
+package simpleindexing;
+
+import java.io.IOException;
+import java.nio.file.Paths;
+import java.util.List;
+
+import org.apache.lucene.document.Document;
+onlyBottomLines: 
+	}
+}
 ------------------------------
 Documento 4
-path: /home/jorge/github/ri/docs/2/archivo21.txt
-contentsStored: linea8
+path: /home/jorge/apuntes/current/ri/practicas/ri-mvn/src/main/java/simpleindexing/DoCosineOfDocs.java
+contentsStored: 
+package simpleindexing;
+
+import java.io.IOException;
+
+public class DoCosineOfDocs {
+
+	/**
+	 * @param args
+	 * 
+	 *             project testlucen8_1_1
+	 * 
+	 */
+	public static void main(String[] args) {
+
+		if (args.length != 1) {
+			System.out.println("Usage: java DoCosineOfDocs indexFolder");
+			return;
+		}
+		// SimpleIndex is the folder where the index SimpleIndex is stored
+
+		String indexFolder = args[0];
+
+		String d1 = "uno uno";
+		String d2 = "uno dos uno dos";
+
+		double c = 0;
+
+		// Coseno(45º) = 0.7071
+
+		try {
+			c = CosineDocumentSimilarity.getCosineSimilarity(d1, d2, indexFolder);
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+
+		System.out.println("Coseno de los docs");
+		System.out.println("d1 = \"" + d1 + "\"");
+		System.out.println("d2 = \"" + d2 + "\"");
+		System.out.println("= " + c);
+		System.out.println();
+
+	}
+}
 hostname: HUAWEI
-thread: pool-1-thread-2
+thread: pool-1-thread-3
 type: regular
-sizeKb: 0.007
-creationTime: 2022-03-16T19:38:28.443541Z
-lastAccessTime: 2022-03-23T12:04:40.365685Z
-lastModifiedTime: 2022-03-16T19:38:28.443541Z
-creationTimeLucene: 20220316193828443
-lastAccessTimeLucene: 20220323120440365
-lastModifiedTimeLucene: 20220316193828443
-onlyTopLines: linea8
-onlyBottomLines: linea8
+sizeKb: 0.889
+creationTime: 2022-02-03T15:30:52.412446Z
+lastAccessTime: 2022-03-27T20:20:34.723018Z
+lastModifiedTime: 2022-02-03T15:30:52.412446Z
+creationTimeLucene: 20220203153052412
+lastAccessTimeLucene: 20220327202034723
+lastModifiedTimeLucene: 20220203153052412
+onlyTopLines: 
+package simpleindexing;
+
+import java.io.IOException;
+
+public class DoCosineOfDocs {
+
+	/**
+onlyBottomLines: 
+	}
+}
 ------------------------------
 Documento 5
-path: /home/jorge/github/ri/docs/2/archivo2.txt
+path: /home/jorge/apuntes/current/ri/practicas/ri-mvn/src/main/java/simpleindexing/SimpleDeleting.java
 contentsStored: 
-linea1
-linea2
-linea8
+package simpleindexing;
+
+import java.io.IOException;
+import java.nio.file.Paths;
+
+import org.apache.lucene.analysis.standard.StandardAnalyzer;
+import org.apache.lucene.index.CorruptIndexException;
+import org.apache.lucene.index.IndexWriter;
+import org.apache.lucene.index.IndexWriterConfig;
+import org.apache.lucene.index.IndexWriterConfig.OpenMode;
+import org.apache.lucene.index.Term;
+import org.apache.lucene.store.FSDirectory;
+import org.apache.lucene.store.LockObtainFailedException;
+
+public class SimpleDeleting {
+
+	/**
+	 * Project testlucene9_0_0 SimpleDeleting class opens the Simple Index and
+	 * delete documents containing a term
+	 */
+	public static void main(String[] args) {
+
+		if (args.length != 1) {
+			System.out.println("Usage: java SimpleDeleting indexFolder");
+			return;
+		}
+
+		String indexFolder = args[0];
+
+		IndexWriterConfig config = new IndexWriterConfig(new StandardAnalyzer());
+		config.setOpenMode(OpenMode.APPEND);
+
+		IndexWriter writer = null;
+
+		try {
+			writer = new IndexWriter(FSDirectory.open(Paths.get(indexFolder)), config);
+		} catch (CorruptIndexException e1) {
+			System.out.println("Graceful message: exception " + e1);
+			e1.printStackTrace();
+		} catch (LockObtainFailedException e1) {
+			System.out.println("Graceful message: exception " + e1);
+			e1.printStackTrace();
+		} catch (IOException e1) {
+			System.out.println("Graceful message: exception " + e1);
+			e1.printStackTrace();
+		}
+
+		try {
+			writer.deleteDocuments(new Term("modelDescription", "boolean"));
+		} catch (IOException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
+		try {
+			writer.deleteDocuments(new Term("modelDescription", "vector"));
+		} catch (IOException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
+		try {
+			writer.forceMergeDeletes();
+			// Forces merging of all segments that have deleted documents.
+		} catch (IOException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
+
+		try {
+			writer.commit();
+			writer.close();
+		} catch (CorruptIndexException e) {
+			System.out.println("Graceful message: exception " + e);
+			e.printStackTrace();
+		} catch (IOException e) {
+			System.out.println("Graceful message: exception " + e);
+			e.printStackTrace();
+		}
+
+	}
+}
 hostname: HUAWEI
-thread: pool-1-thread-2
+thread: pool-1-thread-3
 type: regular
-sizeKb: 0.021
-creationTime: 2022-03-16T19:38:07.180543Z
-lastAccessTime: 2022-03-23T12:04:40.369019Z
-lastModifiedTime: 2022-03-16T19:38:07.180543Z
-creationTimeLucene: 20220316193807180
-lastAccessTimeLucene: 20220323120440369
-lastModifiedTimeLucene: 20220316193807180
+sizeKb: 2.266
+creationTime: 2022-02-03T15:30:52.412446Z
+lastAccessTime: 2022-03-27T20:20:34.726351Z
+lastModifiedTime: 2022-02-03T15:30:52.412446Z
+creationTimeLucene: 20220203153052412
+lastAccessTimeLucene: 20220327202034726
+lastModifiedTimeLucene: 20220203153052412
 onlyTopLines: 
-linea1
-linea2
-linea8
+package simpleindexing;
+
+import java.io.IOException;
+import java.nio.file.Paths;
+
+import org.apache.lucene.analysis.standard.StandardAnalyzer;
+import org.apache.lucene.index.CorruptIndexException;
 onlyBottomLines: 
-linea2
-linea8
+	}
+}
 ------------------------------
 Documento 6
-path: /home/jorge/github/ri/docs/2/archivo23.txt
-contentsStored: linea8
+path: /home/jorge/apuntes/current/ri/practicas/ri-mvn/src/main/java/simpleindexing/SimpleSearch.java
+contentsStored: 
+package simpleindexing;
+
+import java.io.IOException;
+import java.nio.file.Paths;
+
+import org.apache.lucene.analysis.standard.StandardAnalyzer;
+import org.apache.lucene.index.CorruptIndexException;
+import org.apache.lucene.index.DirectoryReader;
+import org.apache.lucene.index.IndexReader;
+import org.apache.lucene.index.Term;
+import org.apache.lucene.queryparser.classic.ParseException;
+import org.apache.lucene.queryparser.classic.QueryParser;
+import org.apache.lucene.search.BooleanClause.Occur;
+import org.apache.lucene.search.BooleanQuery;
+import org.apache.lucene.search.IndexSearcher;
+import org.apache.lucene.search.Query;
+import org.apache.lucene.search.Sort;
+import org.apache.lucene.search.SortField;
+import org.apache.lucene.search.TermQuery;
+import org.apache.lucene.search.TopDocs;
+import org.apache.lucene.store.Directory;
+import org.apache.lucene.store.FSDirectory;
+
+public class SimpleSearch {
+
+	/**
+	 * Project testlucene9_0_0 SimpleSearch class reads the index SimpleIndex
+	 * created with the SimpleIndexing class, creates and Index Searcher and search
+	 * for documents which contain the word "probability" in the field
+	 * "modelDescription" using the StandardAnalyzer Also contains and example
+	 * sorting the results by reverse document number (index order). Also contains
+	 * an example of a boolean programmatic query
+	 * 
+	 */
+	public static void main(String[] args) {
+
+		if (args.length != 1) {
+			System.out.println("Usage: java SimpleSearch SimpleIndex");
+			return;
+		}
+		// SimpleIndex is the folder where the index SimpleIndex is stored
+
+		IndexReader reader = null;
+		Directory dir = null;
+		IndexSearcher searcher = null;
+		QueryParser parser;
+		Query query = null;
+
+		try {
+			dir = FSDirectory.open(Paths.get(args[0]));
+			reader = DirectoryReader.open(dir);
+
+		} catch (CorruptIndexException e1) {
+			System.out.println("Graceful message: exception " + e1);
+			e1.printStackTrace();
+		} catch (IOException e1) {
+			System.out.println("Graceful message: exception " + e1);
+			e1.printStackTrace();
+		}
+
+		searcher = new IndexSearcher(reader);
+		parser = new QueryParser("modelDescription", new StandardAnalyzer());
+
+		try {
+			query = parser.parse("probability");
+		} catch (ParseException e) {
+
+			e.printStackTrace();
+		}
+
+		TopDocs topDocs = null;
+
+		try {
+			topDocs = searcher.search(query, 10);
+		} catch (IOException e1) {
+			System.out.println("Graceful message: exception " + e1);
+			e1.printStackTrace();
+		}
+		System.out.println(
+				"\n" + topDocs.totalHits + " results for query \"" + query.toString() + "\" showing for the first " + 10
+						+ " documents the doc id, score and the content of the modelDescription field");
+
+		for (int i = 0; i < Math.min(10, topDocs.totalHits.value); i++) {
+			try {
+				System.out.println(topDocs.scoreDocs[i].doc + " -- score: " + topDocs.scoreDocs[i].score + " -- "
+						+ reader.document(topDocs.scoreDocs[i].doc).get("modelDescription"));
+			} catch (CorruptIndexException e) {
+				System.out.println("Graceful message: exception " + e);
+				e.printStackTrace();
+			} catch (IOException e) {
+				System.out.println("Graceful message: exception " + e);
+				e.printStackTrace();
+			}
+
+		}
+
+		// follows and example sorting the results
+		// by reverse document number (index order)
+
+		boolean reverse = true;
+		try {
+			topDocs = searcher.search(query, 10,
+					new Sort(new SortField("modelDescription", SortField.Type.DOC, reverse)));
+		} catch (IOException e1) {
+			System.out.println("Graceful message: exception " + e1);
+			e1.printStackTrace();
+		}
+		System.out.println("\n" + topDocs.totalHits + " results for query \"" + query.toString()
+				+ "\" in the sort given by reverse document number, " + "\" showing for the first " + 10
+				+ " documents the doc id, score and the content of the modelDescription field");
+
+		for (int i = 0; i < Math.min(10, topDocs.totalHits.value); i++) {
+			try {
+				System.out.println(topDocs.scoreDocs[i].doc + " -- score: " + topDocs.scoreDocs[i].score + " -- "
+						+ reader.document(topDocs.scoreDocs[i].doc).get("modelDescription"));
+			} catch (CorruptIndexException e) {
+				System.out.println("Graceful message: exception " + e);
+				e.printStackTrace();
+			} catch (IOException e) {
+				System.out.println("Graceful message: exception " + e);
+				e.printStackTrace();
+			}
+
+		}
+
+		// follows some examples of a simple programmatic query
+
+		// BooleanQuery.Builder booleanQueryBuilder = new
+		// BooleanQuery.Builder();
+		// Query vector = new TermQuery(new Term("modelDescription", "vector"));
+		// Query space = new TermQuery(new Term("modelDescription", "space"));
+		// Query model = new TermQuery(new Term("modelDescription", "model"));
+
+		// booleanQueryBuilder.add(vector, Occur.MUST);
+		// booleanQueryBuilder.add(space, Occur.MUST);
+		// booleanQueryBuilder.add(model, Occur.MUST);
+
+		BooleanQuery.Builder booleanQueryBuilder = new BooleanQuery.Builder();
+		Query vector = new TermQuery(new Term("modelDescription", "vector"));
+		Query space = new TermQuery(new Term("modelDescription", "space"));
+		Query model = new TermQuery(new Term("modelDescription", "model"));
+
+		booleanQueryBuilder.add(vector, Occur.SHOULD);
+		booleanQueryBuilder.add(space, Occur.SHOULD);
+		booleanQueryBuilder.add(model, Occur.SHOULD);
+		booleanQueryBuilder.setMinimumNumberShouldMatch(1);
+
+		BooleanQuery booleanQuery = booleanQueryBuilder.build();
+
+		// booleanQueryBuilder is a booleanQuery.Builder object
+		// the method build(), i.e.
+		// booleanQueryBuilder.build() builds a BooleanQuery object
+		// BooleanQuery is a subclass of Query
+
+		try {
+			topDocs = searcher.search(booleanQuery, 10);
+		} catch (IOException e1) {
+			System.out.println("Graceful message: exception " + e1);
+			e1.printStackTrace();
+		}
+
+		System.out.println("\n" + topDocs.totalHits + " results for query \"" + booleanQuery.toString()
+				+ "\" showing for the first " + 10
+				+ " documents the doc id, score and the content of the modelDescription field");
+
+		for (int i = 0; i < Math.min(10, topDocs.totalHits.value); i++) {
+			try {
+				System.out.println(topDocs.scoreDocs[i].doc + " -- score: " + topDocs.scoreDocs[i].score + " -- "
+						+ reader.document(topDocs.scoreDocs[i].doc).get("modelDescription"));
+			} catch (CorruptIndexException e) {
+				System.out.println("Graceful message: exception " + e);
+				e.printStackTrace();
+			} catch (IOException e) {
+				System.out.println("Graceful message: exception " + e);
+				e.printStackTrace();
+			}
+
+		}
+
+		try {
+			reader.close();
+			dir.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+
+}
 hostname: HUAWEI
-thread: pool-1-thread-2
+thread: pool-1-thread-3
 type: regular
-sizeKb: 0.007
-creationTime: 2022-03-16T19:38:39.170039Z
-lastAccessTime: 2022-03-23T12:04:40.372353Z
-lastModifiedTime: 2022-03-16T19:38:39.170039Z
-creationTimeLucene: 20220316193839170
-lastAccessTimeLucene: 20220323120440372
-lastModifiedTimeLucene: 20220316193839170
-onlyTopLines: linea8
-onlyBottomLines: linea8
+sizeKb: 6.571
+creationTime: 2022-02-03T15:30:52.415779Z
+lastAccessTime: 2022-03-27T20:20:34.739682Z
+lastModifiedTime: 2022-02-03T15:30:52.415779Z
+creationTimeLucene: 20220203153052415
+lastAccessTimeLucene: 20220327202034739
+lastModifiedTimeLucene: 20220203153052415
+onlyTopLines: 
+package simpleindexing;
+
+import java.io.IOException;
+import java.nio.file.Paths;
+
+import org.apache.lucene.analysis.standard.StandardAnalyzer;
+import org.apache.lucene.index.CorruptIndexException;
+onlyBottomLines: 
+
+}
 ------------------------------
 Documento 7
-path: /home/jorge/github/ri/docs/2/archivo24.txt
-contentsStored: linea8
+path: /home/jorge/apuntes/current/ri/practicas/ri-mvn/src/main/java/simpleindexing/LargeIndex.java
+contentsStored: 
+package simpleindexing;
+
+import java.io.IOException;
+import java.nio.file.Paths;
+
+import org.apache.lucene.analysis.standard.StandardAnalyzer;
+import org.apache.lucene.document.Document;
+import org.apache.lucene.document.Field;
+import org.apache.lucene.document.IntPoint;
+import org.apache.lucene.document.StoredField;
+import org.apache.lucene.document.StringField;
+import org.apache.lucene.document.TextField;
+import org.apache.lucene.index.CorruptIndexException;
+import org.apache.lucene.index.IndexWriter;
+import org.apache.lucene.index.IndexWriterConfig;
+import org.apache.lucene.store.FSDirectory;
+import org.apache.lucene.store.LockObtainFailedException;
+
+public class LargeIndex {
+
+	/**
+	 * Project testlucene9_0_0 LargeIndex class write a lucene index with some small
+	 * documents but many documents. If the index already exists, the documents are
+	 * appended to the index. More than one segment is expected in the index
+	 */
+	public static void main(String[] args) {
+
+		if (args.length != 1) {
+			System.out.println("Usage: java LargeIndex indexFolder");
+			return;
+		}
+
+		String modelRef[] = new String[4];
+
+		String modelDescription[] = new String[4];
+		String modelAcronym[] = new String[4];
+		int theoreticalContent = 10;
+		int practicalContent = 10;
+
+		modelRef[0] = "RM000";
+		modelRef[1] = "RM001";
+		modelRef[2] = "RM002";
+		modelRef[3] = "RM003";
+
+		modelAcronym[0] = "BM";
+		modelAcronym[1] = "VSM";
+		modelAcronym[2] = "CPM";
+		modelAcronym[3] = "LM";
+
+		modelDescription[0] = "The boolean model is a simple retrieval model where queries are interpreted as boolean expressions and documents are bag of words";
+		modelDescription[1] = "The vector space model is a simple retrieval model where queries and documents are vectors of terms and similarity of queries and documents is computed with the cosine distance";
+		modelDescription[2] = "In the classic probabilistic retrieval model the probability of relevance of a document given a query is computed under the binary and independence assumptions";
+		modelDescription[3] = "The use of language models for retrieval implies the estimation of the probability of generating a query given a document";
+
+		String indexFolder = args[0];
+
+		IndexWriterConfig config = new IndexWriterConfig(new StandardAnalyzer());
+		IndexWriter writer = null;
+
+		try {
+			writer = new IndexWriter(FSDirectory.open(Paths.get(indexFolder)), config);
+		} catch (CorruptIndexException e1) {
+			System.out.println("Graceful message: exception " + e1);
+			e1.printStackTrace();
+		} catch (LockObtainFailedException e1) {
+			System.out.println("Graceful message: exception " + e1);
+			e1.printStackTrace();
+		} catch (IOException e1) {
+			System.out.println("Graceful message: exception " + e1);
+			e1.printStackTrace();
+		}
+
+		/*
+		 * With these calls to IndexWriterConfig and IndexWriter this program creates a
+		 * new index if one does not exist, otherwise it opens the index and documents
+		 * will be appended with writer.addDocument(doc).
+		 */
+
+		for (int j = 0; j < 100000; j++) {
+
+			for (int i = 0; i < modelRef.length; i++) {
+				Document doc = new Document();
+				/*
+				 * Each document has six fields. modelRef is a StringField which is indexed and
+				 * not tokenized. modelAcronym is a StringField which is indexed and not
+				 * tokenized, additionally it is stored. modelDescription is a TextField which
+				 * is indexed and tokenized, additionally it is stored. theoreticalContent is a
+				 * NumericField that is indexed. practicalContent is a NumericField that is
+				 * indexed. storedtheoreticalContent is a stored-only field.
+				 */
+				doc.add(new StringField("modelRef", modelRef[i], null));
+				doc.add(new Field("modelAcronym", modelAcronym[i], StringField.TYPE_STORED));
+
+				doc.add(new TextField("modelDescription", modelDescription[i], Field.Store.YES));
+
+				doc.add(new IntPoint("theoreticalContent", theoreticalContent));
+
+				// IntPoint: An indexed int field for exact/range queries.
+
+				// We also create a separate StoredField for storing the value
+
+				doc.add(new StoredField("storedtheoreticalContent", theoreticalContent++));
+
+				doc.add(new IntPoint("practicalContent", practicalContent++));
+
+				try {
+
+					writer.addDocument(doc);
+				} catch (CorruptIndexException e) {
+					System.out.println("Graceful message: exception " + e);
+					e.printStackTrace();
+				} catch (IOException e) {
+					System.out.println("Graceful message: exception " + e);
+					e.printStackTrace();
+				}
+
+				System.out.println("wrote document " + i + " in the index");
+
+			}
+
+		}
+
+		try {
+			writer.commit();
+			writer.close();
+		} catch (CorruptIndexException e) {
+			System.out.println("Graceful message: exception " + e);
+			e.printStackTrace();
+		} catch (IOException e) {
+			System.out.println("Graceful message: exception " + e);
+			e.printStackTrace();
+		}
+
+	}
+}
 hostname: HUAWEI
-thread: pool-1-thread-2
+thread: pool-1-thread-3
 type: regular
-sizeKb: 0.007
-creationTime: 2022-03-16T19:38:40.870012Z
-lastAccessTime: 2022-03-23T12:04:40.375687Z
-lastModifiedTime: 2022-03-16T19:38:40.870012Z
-creationTimeLucene: 20220316193840870
-lastAccessTimeLucene: 20220323120440375
-lastModifiedTimeLucene: 20220316193840870
-onlyTopLines: linea8
-onlyBottomLines: linea8
+sizeKb: 4.844
+creationTime: 2022-02-03T15:30:52.412446Z
+lastAccessTime: 2022-03-27T20:20:34.723018Z
+lastModifiedTime: 2022-02-03T15:30:52.412446Z
+creationTimeLucene: 20220203153052412
+lastAccessTimeLucene: 20220327202034723
+lastModifiedTimeLucene: 20220203153052412
+onlyTopLines: 
+package simpleindexing;
+
+import java.io.IOException;
+import java.nio.file.Paths;
+
+import org.apache.lucene.analysis.standard.StandardAnalyzer;
+import org.apache.lucene.document.Document;
+onlyBottomLines: 
+	}
+}
 ------------------------------
 Documento 8
-path: /home/jorge/github/ri/docs/2/archivo22.txt
-contentsStored: linea8
+path: /home/jorge/apuntes/current/ri/practicas/ri-mvn/src/main/java/simpleindexing/SimpleReader3.java
+contentsStored: 
+package simpleindexing;
+
+import java.io.IOException;
+import java.nio.file.Paths;
+
+import org.apache.lucene.document.Document;
+import org.apache.lucene.index.CorruptIndexException;
+import org.apache.lucene.index.DirectoryReader;
+import org.apache.lucene.index.FieldInfo;
+import org.apache.lucene.index.FieldInfos;
+import org.apache.lucene.index.LeafReader;
+import org.apache.lucene.index.LeafReaderContext;
+import org.apache.lucene.index.PostingsEnum;
+import org.apache.lucene.index.Term;
+import org.apache.lucene.index.Terms;
+import org.apache.lucene.index.TermsEnum;
+import org.apache.lucene.store.Directory;
+import org.apache.lucene.store.FSDirectory;
+
+public class SimpleReader3 {
+
+	/**
+	 * Los índices de Lucene se almacenan en forma de segmentos, cada segmento se
+	 * considera una hoja (leaf) del índice. Este ejemplo lee los contenidos de un
+	 * índice usando AtomicReaders. Un AtomicReader lee los contenidos de un
+	 * segmento o leaf.
+	 * 
+	 * IndexReader instances for indexes on disk are usually constructed with a call
+	 * to one of the static DirectoryReader.open() methods, e.g.
+	 * DirectoryReader.open(Directory). DirectoryReader implements the
+	 * CompositeReader interface, it is not possible to directly get postings.
+	 * 
+	 * LeafReader: These indexes do not consist of several sub-readers, they are
+	 * atomic. They support retrieval of stored fields, doc values, terms, and
+	 * postings.
+	 *
+	 * Si nuestro índice es pequeño solamente tendrá un segmento por lo que la
+	 * llamada indexReadrigradoer.getContext().leaves() nos dará una lista con un
+	 * único LeafReaderContext (objeto del cual se obtiene el LeafReader).
+	 */
+	public static void main(final String[] args) throws IOException {
+
+		if (args.length != 1) {
+			System.out.println("Usage: java SimpleReader <index_folder>");
+			return;
+		}
+
+		Directory dir = null;
+		DirectoryReader indexReader = null;
+
+		try {
+			dir = FSDirectory.open(Paths.get(args[0]));
+			indexReader = DirectoryReader.open(dir);
+		} catch (CorruptIndexException e1) {
+			System.out.println("Graceful message: exception " + e1);
+			e1.printStackTrace();
+		} catch (IOException e1) {
+			System.out.println("Graceful message: exception " + e1);
+			e1.printStackTrace();
+		}
+
+		// Get the context for each leaf (segment)
+
+		/**
+		 * We can do for (final LeafReaderContext leaf :
+		 * indexReader.getContext().leaves()) { or ---
+		 */
+
+		System.out.println("Size of  indexReader.leaves() = " + indexReader.leaves().size());
+
+		for (final LeafReaderContext leaf : indexReader.leaves()) {
+			// Print leaf number (starting from zero)
+			System.out.println("We are in the leaf number " + leaf.ord);
+
+			// Create an AtomicReader for each leaf
+			// (using, again, Java 7 try-with-resources syntax)
+			try (LeafReader leafReader = leaf.reader()) {
+
+				// Get the fields contained in the current segment/leaf
+				final FieldInfos fieldinfos = leafReader.getFieldInfos();
+				System.out.println("Numero de campos devuelto por leafReader.getFieldInfos() = " + fieldinfos.size());
+
+				for (final FieldInfo fieldinfo : fieldinfos) {
+
+					System.out.println("Field = " + fieldinfo.name);
+					final Terms terms = leafReader.terms(fieldinfo.name);
+					if (terms != null) {
+
+						final TermsEnum termsEnum = terms.iterator();
+
+						while (termsEnum.next() != null) {
+							final String tt = termsEnum.term().utf8ToString();
+							// totalFreq equals -1 if the value was not
+							// stored in the codification of this index
+							System.out.println("\t" + tt + "\ttotalFreq()=" + termsEnum.totalTermFreq() + "\tdocFreq="
+									+ termsEnum.docFreq());
+
+						}
+					}
+				}
+
+				int doc;
+				final Term term = new Term("modelDescription", "probability");
+				final PostingsEnum postingsEnum = leafReader.postings(term);
+
+				while ((doc = postingsEnum.nextDoc()) != PostingsEnum.NO_MORE_DOCS) {
+					System.out.println("\nTerm(field=modelDescription, text=probability)" + " appears in doc num: "
+							+ doc + " with term frequency= " + postingsEnum.freq());
+					final Document d = leafReader.document(doc);
+					System.out.println("modelDescription = " + d.get("modelDescription"));
+				}
+
+			}
+		}
+
+	}
+
+}
 hostname: HUAWEI
-thread: pool-1-thread-2
+thread: pool-1-thread-3
 type: regular
-sizeKb: 0.007
-creationTime: 2022-03-16T19:38:35.113436Z
-lastAccessTime: 2022-03-23T12:04:40.379021Z
-lastModifiedTime: 2022-03-16T19:38:35.113436Z
-creationTimeLucene: 20220316193835113
-lastAccessTimeLucene: 20220323120440379
-lastModifiedTimeLucene: 20220316193835113
-onlyTopLines: linea8
-onlyBottomLines: linea8
+sizeKb: 4.166
+creationTime: 2022-02-03T15:30:52.415779Z
+lastAccessTime: 2022-03-27T20:20:34.736349Z
+lastModifiedTime: 2022-02-03T15:30:52.415779Z
+creationTimeLucene: 20220203153052415
+lastAccessTimeLucene: 20220327202034736
+lastModifiedTimeLucene: 20220203153052415
+onlyTopLines: 
+package simpleindexing;
+
+import java.io.IOException;
+import java.nio.file.Paths;
+
+import org.apache.lucene.document.Document;
+import org.apache.lucene.index.CorruptIndexException;
+onlyBottomLines: 
+
+}
 ------------------------------
 Documento 9
-path: /home/jorge/github/ri/docs/1/archivo1.txt
+path: /home/jorge/apuntes/current/ri/practicas/ri-mvn/src/main/java/simpleindexing/CosineDocumentSimilarity.java
 contentsStored: 
-linea1
-linea1
-linea1
-linea2
-linea2
-linea3
-linea4
-linea5
-linea6
-linea7
-linea8
+package simpleindexing;
+
+//Adapted from http://stackoverflow.com/questions/1844194/
+
+//get-cosine-similarity-between-two-documents-in-lucene
+
+import java.io.IOException;
+import java.nio.file.Paths;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+
+import org.apache.commons.math3.linear.ArrayRealVector;
+import org.apache.commons.math3.linear.RealVector;
+import org.apache.lucene.analysis.Analyzer;
+import org.apache.lucene.analysis.core.SimpleAnalyzer;
+import org.apache.lucene.document.Document;
+import org.apache.lucene.document.Field;
+import org.apache.lucene.document.FieldType;
+import org.apache.lucene.index.DirectoryReader;
+import org.apache.lucene.index.IndexOptions;
+import org.apache.lucene.index.IndexReader;
+import org.apache.lucene.index.IndexWriter;
+import org.apache.lucene.index.IndexWriterConfig;
+import org.apache.lucene.index.Terms;
+import org.apache.lucene.index.TermsEnum;
+import org.apache.lucene.store.Directory;
+import org.apache.lucene.store.MMapDirectory;
+import org.apache.lucene.util.BytesRef;
+
+public class CosineDocumentSimilarity {
+
+	public static final String CONTENT = "Content";
+	private final Set<String> terms = new HashSet<>();
+	private final RealVector v1;
+	private final RealVector v2;
+
+	CosineDocumentSimilarity(String s1, String s2, String spath) throws IOException {
+		Directory directory = createIndex(s1, s2, spath);
+		IndexReader reader = DirectoryReader.open(directory);
+		Map<String, Integer> f1 = getTermFrequencies(reader, 0);
+		Map<String, Integer> f2 = getTermFrequencies(reader, 1);
+		reader.close();
+		v1 = toRealVector(f1);
+		v2 = toRealVector(f2);
+	}
+
+	Directory createIndex(String s1, String s2, String spath) throws IOException {
+
+		MMapDirectory directory = new MMapDirectory(Paths.get(spath));
+
+		/*
+		 * File-based Directory implementation that uses mmap for reading, and
+		 * FSDirectory.FSIndexOutput for writing.
+		 * 
+		 * RAMDirectory uses inefficient synchronization and is discouraged in lucene
+		 * 8.x in favor of MMapDirectory and it will be removed in future versions of
+		 * Lucene.
+		 */
+
+		Analyzer analyzer = new SimpleAnalyzer();
+		IndexWriterConfig iwc = new IndexWriterConfig(analyzer);
+		IndexWriter writer = new IndexWriter(directory, iwc);
+		addDocument(writer, s1);
+		addDocument(writer, s2);
+		writer.close();
+		return directory;
+	}
+
+	/* Indexed, tokenized, stored. */
+	public static final FieldType TYPE_STORED = new FieldType();
+
+	static final IndexOptions options = IndexOptions.DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS;
+
+	static {
+		TYPE_STORED.setIndexOptions(options);
+		TYPE_STORED.setTokenized(true);
+		TYPE_STORED.setStored(true);
+		TYPE_STORED.setStoreTermVectors(true);
+		TYPE_STORED.setStoreTermVectorPositions(true);
+		TYPE_STORED.freeze();
+	}
+
+	void addDocument(IndexWriter writer, String content) throws IOException {
+		Document doc = new Document();
+		Field field = new Field(CONTENT, content, TYPE_STORED);
+		doc.add(field);
+		writer.addDocument(doc);
+	}
+
+	double getCosineSimilarity() {
+		return (v1.dotProduct(v2)) / (v1.getNorm() * v2.getNorm());
+	}
+
+	public static double getCosineSimilarity(String s1, String s2, String spath) throws IOException {
+		return new CosineDocumentSimilarity(s1, s2, spath).getCosineSimilarity();
+	}
+
+	Map<String, Integer> getTermFrequencies(IndexReader reader, int docId) throws IOException {
+		Terms vector = reader.getTermVector(docId, CONTENT);
+		// IndexReader.getTermVector(int docID, String field):
+		// Retrieve term vector for this document and field, or null if term
+		// vectors were not indexed.
+		// The returned Fields instance acts like a single-document inverted
+		// index (the docID will be 0).
+
+		// Por esta razon al iterar sobre los terminos la totalTermFreq que es
+		// la frecuencia
+		// de un termino en la coleccion, en este caso es la frecuencia del
+		// termino en docID,
+		// es decir, el tf del termino en el documento docID
+
+		TermsEnum termsEnum = null;
+		termsEnum = vector.iterator();
+		Map<String, Integer> frequencies = new HashMap<>();
+		BytesRef text = null;
+		while ((text = termsEnum.next()) != null) {
+			String term = text.utf8ToString();
+			int freq = (int) termsEnum.totalTermFreq();
+			frequencies.put(term, freq);
+			terms.add(term);
+		}
+		return frequencies;
+	}
+
+	RealVector toRealVector(Map<String, Integer> map) {
+		RealVector vector = new ArrayRealVector(terms.size());
+		int i = 0;
+		for (String term : terms) {
+			int value = map.containsKey(term) ? map.get(term) : 0;
+			vector.setEntry(i++, value);
+		}
+		return (RealVector) vector.mapDivide(vector.getL1Norm());
+		// la división por la norma L1 del vector no es necesaria
+		// pero tampoco afecta al calculo del coseno
+
+	}
+}
 hostname: HUAWEI
 thread: pool-1-thread-3
 type: regular
-sizeKb: 0.077
-creationTime: 2022-03-16T19:23:30.962915Z
-lastAccessTime: 2022-03-23T12:04:40.178981Z
-lastModifiedTime: 2022-03-16T19:23:30.962915Z
-creationTimeLucene: 20220316192330962
-lastAccessTimeLucene: 20220323120440178
-lastModifiedTimeLucene: 20220316192330962
+sizeKb: 4.71
+creationTime: 2022-02-03T15:30:52.412446Z
+lastAccessTime: 2022-03-27T20:20:34.719685Z
+lastModifiedTime: 2022-02-03T15:30:52.412446Z
+creationTimeLucene: 20220203153052412
+lastAccessTimeLucene: 20220327202034719
+lastModifiedTimeLucene: 20220203153052412
 onlyTopLines: 
-linea1
-linea1
-linea1
-linea2
-linea2
-linea3
-linea4
+package simpleindexing;
+
+//Adapted from http://stackoverflow.com/questions/1844194/
+
+//get-cosine-similarity-between-two-documents-in-lucene
+
+import java.io.IOException;
 onlyBottomLines: 
-linea7
-linea8
+	}
+}
 ------------------------------
 Documento 10
-path: /home/jorge/github/ri/docs/1/11/archivo11.txt
-contentsStored: linea1
+path: /home/jorge/apuntes/current/ri/practicas/ri-mvn/src/main/java/simpleindexing/SimpleThread1.java
+contentsStored: 
+package simpleindexing;
+
+/*
+ * Crea dos threads y el thread main espera a que acaben
+ * 
+ */
+
+class PrintThread extends Thread {
+	String s;
+
+	PrintThread(String s) {
+		this.s = s;
+	}
+
+	public void run() {
+		for (int x = 0; x < 10; ++x) {
+			try {
+				Thread.sleep(1000);
+			} catch (InterruptedException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} /* sleep 1s. to give a chance to other threads */
+			System.out.print(s);
+		}
+
+	}
+}
+
+public class SimpleThread1 {
+
+	/**
+	 * @param args
+	 * @throws InterruptedException
+	 */
+	public static void main(String[] args) throws InterruptedException {
+
+		PrintThread p1 = new PrintThread("AAAAAA");
+		p1.start();
+		PrintThread p2 = new PrintThread("BBBBBB");
+		p2.start();
+
+		try {
+			p1.join();
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		try {
+			p2.join();
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+
+		System.out.println();
+		System.out.println("Finalizado thread " + p1.getName());
+
+		System.out.println();
+		System.out.println("Finalizado thread " + p2.getName());
+
+	}
+
+}
 hostname: HUAWEI
 thread: pool-1-thread-3
 type: regular
-sizeKb: 0.007
-creationTime: 2022-03-16T12:08:47.516167Z
-lastAccessTime: 2022-03-23T12:04:40.362351Z
-lastModifiedTime: 2022-03-16T12:08:47.516167Z
-creationTimeLucene: 20220316120847516
-lastAccessTimeLucene: 20220323120440362
-lastModifiedTimeLucene: 20220316120847516
-onlyTopLines: linea1
-onlyBottomLines: linea1
+sizeKb: 1.168
+creationTime: 2022-02-03T15:30:52.415779Z
+lastAccessTime: 2022-03-27T20:20:34.739682Z
+lastModifiedTime: 2022-02-03T15:30:52.415779Z
+creationTimeLucene: 20220203153052415
+lastAccessTimeLucene: 20220327202034739
+lastModifiedTimeLucene: 20220203153052415
+onlyTopLines: 
+package simpleindexing;
+
+/*
+ * Crea dos threads y el thread main espera a que acaben
+ * 
+ */
+
+onlyBottomLines: 
+
+}
+------------------------------
+Documento 11
+path: /home/jorge/apuntes/current/ri/practicas/ri-mvn/src/main/java/simpleindexing/SimpleThread2.java
+contentsStored: 
+package simpleindexing;
+
+/*
+ * projecto testlucene8_1_1
+ * El main invoca dos threads, cada uno crea un índice MMapDirectory
+ * El main espera que acaben los dos threads (con p1.join() y p2.join()
+ * El main fusiona los dos índices en otro
+ * El main busca en este índice fusionado
+ * 
+ * Alternativamente se podria hacer que los threads
+ * indexen concurrentemente sobre el mismo indice sin necesidad de crear
+ * indices distintos ya que el IndexWriter es Thread Safe
+ */
+
+import java.io.IOException;
+import java.nio.file.Paths;
+
+import org.apache.lucene.analysis.Analyzer;
+import org.apache.lucene.analysis.standard.StandardAnalyzer;
+import org.apache.lucene.document.Document;
+import org.apache.lucene.document.Field;
+import org.apache.lucene.document.TextField;
+import org.apache.lucene.index.DirectoryReader;
+import org.apache.lucene.index.IndexWriter;
+import org.apache.lucene.index.IndexWriterConfig;
+import org.apache.lucene.queryparser.classic.ParseException;
+import org.apache.lucene.queryparser.classic.QueryParser;
+import org.apache.lucene.search.IndexSearcher;
+import org.apache.lucene.search.Query;
+import org.apache.lucene.search.ScoreDoc;
+import org.apache.lucene.store.MMapDirectory;;
+
+class IndexThread extends Thread {
+	String s;
+	MMapDirectory dir;
+
+	IndexThread(MMapDirectory dir, String s) {
+		this.dir = dir;
+		this.s = s;
+	}
+
+	public void run() {
+		Analyzer analyzer = new StandardAnalyzer();
+
+		// Store the index in memory:
+		// To store an index on disk, use this instead:
+		// Directory directory = FSDirectory.open("/tmp/testindex");
+		IndexWriterConfig config = new IndexWriterConfig(analyzer);
+		IndexWriter iwriter = null;
+		try {
+			iwriter = new IndexWriter(dir, config);
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		Document doc = new Document();
+		doc.add(new Field("fieldname", s, TextField.TYPE_STORED));
+		try {
+			iwriter.addDocument(doc);
+			iwriter.commit();
+			iwriter.close();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+
+	}
+}
+
+public class SimpleThread2 {
+
+	/**
+	 * @param args
+	 * @throws InterruptedException
+	 */
+	public static void main(String[] args) throws InterruptedException {
+
+		String doc1 = "Este es el texto que indexa el primer thread";
+		String doc2 = "Este es el texto que indexa el segundo thread";
+
+		MMapDirectory dir1 = null;
+		try {
+			dir1 = new MMapDirectory(Paths.get("/tmp/LuceneIndex1/"));
+		} catch (IOException e2) {
+			// TODO Auto-generated catch block
+			e2.printStackTrace();
+		}
+		MMapDirectory dir2 = null;
+		try {
+			dir2 = new MMapDirectory(Paths.get("/tmp/LuceneIndex2/"));
+		} catch (IOException e2) {
+			// TODO Auto-generated catch block
+			e2.printStackTrace();
+		}
+
+		IndexThread p1 = new IndexThread((MMapDirectory) dir1, doc1);
+		p1.start();
+		IndexThread p2 = new IndexThread((MMapDirectory) dir2, doc2);
+		p2.start();
+
+		try {
+			p1.join();
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		try {
+			p2.join();
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+
+		System.out.println();
+		System.out.println("Finalizado thread " + p1.getName());
+
+		System.out.println();
+		System.out.println("Finalizado thread " + p2.getName());
+
+		IndexWriterConfig iconfig = new IndexWriterConfig(new StandardAnalyzer());
+		IndexWriter ifusedwriter = null;
+
+		MMapDirectory dir3 = null;
+		try {
+			dir3 = new MMapDirectory(Paths.get("/tmp/LuceneIndex3/"));
+		} catch (IOException e2) {
+			// TODO Auto-generated catch block
+			e2.printStackTrace();
+		}
+
+		try {
+			ifusedwriter = new IndexWriter(dir3, iconfig);
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+
+		try {
+			ifusedwriter.addIndexes(dir1, dir2);
+		} catch (IOException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
+		try {
+			ifusedwriter.commit();
+			ifusedwriter.close();
+		} catch (IOException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
+
+		DirectoryReader ifusedreader = null;
+		try {
+			ifusedreader = DirectoryReader.open(dir3);
+		} catch (IOException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
+		IndexSearcher isearcher = new IndexSearcher(ifusedreader);
+		// Parse a simple query that searches for "text":
+		QueryParser parser = new QueryParser("fieldname", new StandardAnalyzer());
+		Query query = null;
+		try {
+			query = parser.parse("thread");
+		} catch (ParseException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		ScoreDoc[] hits = null;
+		try {
+			hits = isearcher.search(query, 1000).scoreDocs;
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		// Iterate through the results:
+
+		for (int i = 0; i < hits.length; i++) {
+			Document hitDoc = null;
+			try {
+				hitDoc = isearcher.doc(hits[i].doc);
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			System.out.println(
+					"This is the text of the document that was indexed and there is a hit for the query 'thread': "
+							+ hitDoc.get("fieldname"));
+
+		}
+		try {
+			dir1.close();
+			dir2.close();
+			ifusedreader.close();
+			dir3.close();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+
+	}
+}
+hostname: HUAWEI
+thread: pool-1-thread-3
+type: regular
+sizeKb: 5.414
+creationTime: 2022-02-03T15:30:52.415779Z
+lastAccessTime: 2022-03-27T20:20:34.739682Z
+lastModifiedTime: 2022-02-03T15:30:52.415779Z
+creationTimeLucene: 20220203153052415
+lastAccessTimeLucene: 20220327202034739
+lastModifiedTimeLucene: 20220203153052415
+onlyTopLines: 
+package simpleindexing;
+
+/*
+ * projecto testlucene8_1_1
+ * El main invoca dos threads, cada uno crea un índice MMapDirectory
+ * El main espera que acaben los dos threads (con p1.join() y p2.join()
+ * El main fusiona los dos índices en otro
+onlyBottomLines: 
+	}
+}
+------------------------------
+Documento 12
+path: /home/jorge/apuntes/current/ri/practicas/ri-mvn/src/main/java/simpleindexing/SimpleReader1v2.java
+contentsStored: 
+package simpleindexing;
+
+import java.io.IOException;
+import java.nio.file.Paths;
+import java.util.List;
+
+import org.apache.lucene.document.Document;
+import org.apache.lucene.index.CorruptIndexException;
+import org.apache.lucene.index.DirectoryReader;
+import org.apache.lucene.index.IndexableField;
+import org.apache.lucene.index.Term;
+import org.apache.lucene.search.CollectionStatistics;
+import org.apache.lucene.search.IndexSearcher;
+import org.apache.lucene.store.Directory;
+import org.apache.lucene.store.FSDirectory;
+
+public class SimpleReader1v2 {
+
+	/**
+	 * Project testlucene9_0_0 SimpleReader1 class reads the index SimpleIndex
+	 * created with the SimpleIndexing class
+	 */
+	public static void main(String[] args) {
+
+		if (args.length != 1) {
+			System.out.println("Usage: java SimpleReader1 SimpleIndex");
+			return;
+		}
+		// SimpleIndex is the folder where the index SimpleIndex is stored
+
+		String indexFolder = args[0];
+
+		Directory dir = null;
+		DirectoryReader indexReader = null;
+		Document doc = null;
+
+		List<IndexableField> fields = null;
+
+		try {
+			dir = FSDirectory.open(Paths.get(indexFolder));
+			indexReader = DirectoryReader.open(dir);
+		} catch (CorruptIndexException e1) {
+			System.out.println("Graceful message: exception " + e1);
+			e1.printStackTrace();
+		} catch (IOException e1) {
+			System.out.println("Graceful message: exception " + e1);
+			e1.printStackTrace();
+		}
+
+		for (int i = 0; i < indexReader.numDocs(); i++) {
+
+			try {
+				doc = indexReader.document(i);
+			} catch (CorruptIndexException e1) {
+				System.out.println("Graceful message: exception " + e1);
+				e1.printStackTrace();
+			} catch (IOException e1) {
+				System.out.println("Graceful message: exception " + e1);
+				e1.printStackTrace();
+			}
+			System.out.println("Documento " + i);
+			System.out.println("modelRef = " + doc.get("modelRef"));
+			System.out.println("modelAcronym = " + doc.get("modelAcronym"));
+			System.out.println("modelDescription = " + doc.get("modelDescription"));
+			System.out.println("theoreticalContent = " + doc.get("theoreticalContent"));
+			System.out.println("storedtheoreticalContent = " + doc.get("storedtheoreticalContent"));
+			System.out.println("practicalContent = " + doc.get("practicalContent"));
+		}
+
+		/**
+		 * Note doc.get() returns null for the fields that were not stored
+		 */
+
+		for (int i = 0; i < indexReader.numDocs(); i++) {
+
+			try {
+				doc = indexReader.document(i);
+			} catch (CorruptIndexException e1) {
+				System.out.println("Graceful message: exception " + e1);
+				e1.printStackTrace();
+			} catch (IOException e1) {
+				System.out.println("Graceful message: exception " + e1);
+				e1.printStackTrace();
+			}
+
+			System.out.println("Documento " + i);
+
+			fields = doc.getFields();
+			// Note doc.getFields() gets the stored fields
+
+			for (IndexableField field : fields) {
+				String fieldName = field.name();
+				System.out.println(fieldName + ": " + doc.get(fieldName));
+
+			}
+
+		}
+
+		final Term term = new Term("modelDescription", "model");
+		try {
+			System.out.println("\nTerm(field=modelDescription, text=model)" + "doc frequency= "
+					+ indexReader.docFreq(term) + "total term frequency= " + indexReader.totalTermFreq(term));
+		} catch (IOException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
+
+		IndexSearcher searcher = null;
+		searcher = new IndexSearcher(indexReader);
+
+		CollectionStatistics modelDescriptionStatistics = null;
+		try {
+			modelDescriptionStatistics = searcher.collectionStatistics("modelDescription");
+		} catch (IOException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
+		System.out.println("\nmodel Description Statistics\n");
+		System.out.println("\nfield= " + modelDescriptionStatistics.field() + " docCount= "
+				+ modelDescriptionStatistics.docCount() + " maxDoc= " + modelDescriptionStatistics.maxDoc()
+				+ " sumDocFreq= " + modelDescriptionStatistics.sumDocFreq() + " sumTotalFreq= "
+				+ modelDescriptionStatistics.sumTotalTermFreq());
+
+		try {
+			indexReader.close();
+			dir.close();
+		} catch (IOException e) {
+			System.out.println("Graceful message: exception " + e);
+			e.printStackTrace();
+		}
+
+	}
+}
+hostname: HUAWEI
+thread: pool-1-thread-3
+type: regular
+sizeKb: 4.171
+creationTime: 2022-02-03T15:30:52.415779Z
+lastAccessTime: 2022-03-27T20:20:34.733016Z
+lastModifiedTime: 2022-02-03T15:30:52.415779Z
+creationTimeLucene: 20220203153052415
+lastAccessTimeLucene: 20220327202034733
+lastModifiedTimeLucene: 20220203153052415
+onlyTopLines: 
+package simpleindexing;
+
+import java.io.IOException;
+import java.nio.file.Paths;
+import java.util.List;
+
+import org.apache.lucene.document.Document;
+onlyBottomLines: 
+	}
+}
+------------------------------
+Documento 13
+path: /home/jorge/apuntes/current/ri/practicas/ri-mvn/src/main/java/simpleindexing/SimpleIndexing1.java
+contentsStored: 
+package simpleindexing;
+
+import java.io.IOException;
+import java.nio.file.Paths;
+
+import org.apache.lucene.analysis.standard.StandardAnalyzer;
+import org.apache.lucene.document.Document;
+import org.apache.lucene.document.Field;
+import org.apache.lucene.document.IntPoint;
+import org.apache.lucene.document.StoredField;
+import org.apache.lucene.document.StringField;
+import org.apache.lucene.document.TextField;
+import org.apache.lucene.index.CorruptIndexException;
+import org.apache.lucene.index.IndexWriter;
+import org.apache.lucene.index.IndexWriterConfig;
+import org.apache.lucene.store.FSDirectory;
+import org.apache.lucene.store.LockObtainFailedException;
+
+public class SimpleIndexing1 {
+
+	/**
+	 * Project testlucene9_0_0 SimpleIndexing class write a lucene index with some
+	 * small documents. If the index already exists, the documents are appended to
+	 * the index
+	 */
+	public static void main(String[] args) {
+
+		if (args.length != 1) {
+			System.out.println("Usage: java SimpleIndexing1 indexFolder");
+			return;
+		}
+
+		String modelRef[] = new String[4];
+
+		String modelDescription[] = new String[4];
+		String modelAcronym[] = new String[4];
+		int theoreticalContent = 10;
+		int practicalContent = 10;
+
+		modelRef[0] = "RM000";
+		modelRef[1] = "RM001";
+		modelRef[2] = "RM002";
+		modelRef[3] = "RM003";
+
+		modelAcronym[0] = "BM";
+		modelAcronym[1] = "VSM";
+		modelAcronym[2] = "CPM";
+		modelAcronym[3] = "LM";
+
+		modelDescription[0] = "The boolean model is a simple retrieval model where queries are interpreted as boolean expressions and documents are bag of words";
+		modelDescription[1] = "The vector space model is a simple retrieval model where queries and documents are vectors of terms and similarity of queries and documents is computed with the cosine distance";
+		modelDescription[2] = "In the classic probabilistic retrieval model the probability of relevance of a document given a query is computed under the binary and independence assumptions";
+		modelDescription[3] = "The use of language models for retrieval implies the estimation of the probability of generating a query given a document";
+
+		String indexFolder = args[0];
+
+		IndexWriterConfig config = new IndexWriterConfig(new StandardAnalyzer());
+		IndexWriter writer = null;
+
+		try {
+			writer = new IndexWriter(FSDirectory.open(Paths.get(indexFolder)), config);
+		} catch (CorruptIndexException e1) {
+			System.out.println("Graceful message: exception " + e1);
+			e1.printStackTrace();
+		} catch (LockObtainFailedException e1) {
+			System.out.println("Graceful message: exception " + e1);
+			e1.printStackTrace();
+		} catch (IOException e1) {
+			System.out.println("Graceful message: exception " + e1);
+			e1.printStackTrace();
+		}
+
+		/*
+		 * With these calls to IndexWriterConfig and IndexWriter this program creates a
+		 * new index if one does not exist, otherwise it opens the index and documents
+		 * will be appended with writer.addDocument(doc).
+		 */
+
+		for (int i = 0; i < modelRef.length; i++) {
+			Document doc = new Document();
+			/*
+			 * Each document has six fields. modelRef is a StringField which is indexed and
+			 * not tokenized. modelAcronym is a StringField which is indexed and not
+			 * tokenized, additionally it is stored. modelDescription is a TextField which
+			 * is indexed and tokenized, additionally it is stored. theoreticalContent is a
+			 * NumericField that is indexed. practicalContent is a NumericField that is
+			 * indexed. storedtheoreticalContent is a stored-only field.
+			 */
+			doc.add(new StringField("modelRef", modelRef[i], null));
+			doc.add(new Field("modelAcronym", modelAcronym[i], StringField.TYPE_STORED));
+
+			doc.add(new TextField("modelDescription", modelDescription[i], Field.Store.YES));
+
+			doc.add(new IntPoint("theoreticalContent", theoreticalContent));
+
+			// IntPoint: An indexed int field for exact/range queries.
+
+			// We also create a separate StoredField for storing the value
+
+			doc.add(new StoredField("storedtheoreticalContent", theoreticalContent++));
+
+			doc.add(new IntPoint("practicalContent", practicalContent++));
+
+			try {
+
+				writer.addDocument(doc);
+			} catch (CorruptIndexException e) {
+				System.out.println("Graceful message: exception " + e);
+				e.printStackTrace();
+			} catch (IOException e) {
+				System.out.println("Graceful message: exception " + e);
+				e.printStackTrace();
+			}
+
+			System.out.println("wrote document " + i + " in the index");
+
+		}
+
+		try {
+			writer.commit();
+			writer.close();
+		} catch (CorruptIndexException e) {
+			System.out.println("Graceful message: exception " + e);
+			e.printStackTrace();
+		} catch (IOException e) {
+			System.out.println("Graceful message: exception " + e);
+			e.printStackTrace();
+		}
+
+	}
+}
+hostname: HUAWEI
+thread: pool-1-thread-3
+type: regular
+sizeKb: 4.719
+creationTime: 2022-02-03T15:30:52.412446Z
+lastAccessTime: 2022-03-27T20:20:34.726351Z
+lastModifiedTime: 2022-02-03T15:30:52.412446Z
+creationTimeLucene: 20220203153052412
+lastAccessTimeLucene: 20220327202034726
+lastModifiedTimeLucene: 20220203153052412
+onlyTopLines: 
+package simpleindexing;
+
+import java.io.IOException;
+import java.nio.file.Paths;
+
+import org.apache.lucene.analysis.standard.StandardAnalyzer;
+import org.apache.lucene.document.Document;
+onlyBottomLines: 
+	}
+}
+------------------------------
+Documento 14
+path: /home/jorge/apuntes/current/ri/practicas/ri-mvn/src/main/java/simpleindexing/SimpleIndexing2.java
+contentsStored: 
+package simpleindexing;
+
+import java.io.IOException;
+import java.nio.file.Paths;
+
+import org.apache.lucene.analysis.en.EnglishAnalyzer;
+import org.apache.lucene.document.Document;
+import org.apache.lucene.document.Field;
+import org.apache.lucene.document.IntPoint;
+import org.apache.lucene.document.StoredField;
+import org.apache.lucene.document.StringField;
+import org.apache.lucene.document.TextField;
+import org.apache.lucene.index.CorruptIndexException;
+import org.apache.lucene.index.IndexWriter;
+import org.apache.lucene.index.IndexWriterConfig;
+import org.apache.lucene.store.FSDirectory;
+import org.apache.lucene.store.LockObtainFailedException;
+
+public class SimpleIndexing2 {
+
+	/**
+	 * Project testlucene9_0_0 SimpleIndexing class write a lucene index with some
+	 * small documents. If the index already exists, the documents are appended to
+	 * the index. We use EnglishAnalyzer instead of StandardAnalyzer, which includes
+	 * PorterStemmer for English
+	 */
+	public static void main(String[] args) {
+
+		if (args.length != 1) {
+			System.out.println("Usage: java SimpleIndexing2 indexFolder");
+			return;
+		}
+
+		String modelRef[] = new String[4];
+
+		String modelDescription[] = new String[4];
+		String modelAcronym[] = new String[4];
+		int theoreticalContent = 10;
+		int practicalContent = 10;
+
+		modelRef[0] = "RM000";
+		modelRef[1] = "RM001";
+		modelRef[2] = "RM002";
+		modelRef[3] = "RM003";
+
+		modelAcronym[0] = "BM";
+		modelAcronym[1] = "VSM";
+		modelAcronym[2] = "CPM";
+		modelAcronym[3] = "LM";
+
+		modelDescription[0] = "The boolean model is a simple retrieval model where queries are interpreted as boolean expressions and documents are bag of words";
+		modelDescription[1] = "The vector space model is a simple retrieval model where queries and documents are vectors of terms and similarity of queries and documents is computed with the cosine distance";
+		modelDescription[2] = "In the classic probabilistic retrieval model the probability of relevance of a document given a query is computed under the binary and independence assumptions";
+		modelDescription[3] = "The use of language models for retrieval implies the estimation of the probability of generating a query given a document";
+
+		String indexFolder = args[0];
+
+		IndexWriterConfig config = new IndexWriterConfig(new EnglishAnalyzer());
+		IndexWriter writer = null;
+
+		try {
+			writer = new IndexWriter(FSDirectory.open(Paths.get(indexFolder)), config);
+		} catch (CorruptIndexException e1) {
+			System.out.println("Graceful message: exception " + e1);
+			e1.printStackTrace();
+		} catch (LockObtainFailedException e1) {
+			System.out.println("Graceful message: exception " + e1);
+			e1.printStackTrace();
+		} catch (IOException e1) {
+			System.out.println("Graceful message: exception " + e1);
+			e1.printStackTrace();
+		}
+
+		/*
+		 * With these calls to IndexWriterConfig and IndexWriter this program creates a
+		 * new index if one does not exist, otherwise it opens the index and documents
+		 * will be appended with writer.addDocument(doc).
+		 */
+
+		for (int i = 0; i < modelRef.length; i++) {
+			Document doc = new Document();
+			/*
+			 * Each document has six fields. modelRef is a StringField which is indexed and
+			 * not tokenized. modelAcronym is a StringField which is indexed and not
+			 * tokenized, additionally it is stored. modelDescription is a TextField which
+			 * is indexed and tokenized, additionally it is stored. theoreticalContent is a
+			 * NumericField that is indexed. practicalContent is a NumericField that is
+			 * indexed. storedtheoreticalContent is a stored-only field.
+			 */
+			doc.add(new StringField("modelRef", modelRef[i], null));
+			doc.add(new Field("modelAcronym", modelAcronym[i], StringField.TYPE_STORED));
+
+			doc.add(new TextField("modelDescription", modelDescription[i], Field.Store.YES));
+
+			doc.add(new IntPoint("theoreticalContent", theoreticalContent));
+
+			// IntPoint: An indexed int field for exact/range queries.
+
+			// We also create a separate StoredField for storing the value
+
+			doc.add(new StoredField("storedtheoreticalContent", theoreticalContent++));
+
+			doc.add(new IntPoint("practicalContent", practicalContent++));
+
+			try {
+
+				writer.addDocument(doc);
+			} catch (CorruptIndexException e) {
+				System.out.println("Graceful message: exception " + e);
+				e.printStackTrace();
+			} catch (IOException e) {
+				System.out.println("Graceful message: exception " + e);
+				e.printStackTrace();
+			}
+
+			System.out.println("wrote document " + i + " in the index");
+
+		}
+
+		try {
+			writer.commit();
+			writer.close();
+		} catch (CorruptIndexException e) {
+			System.out.println("Graceful message: exception " + e);
+			e.printStackTrace();
+		} catch (IOException e) {
+			System.out.println("Graceful message: exception " + e);
+			e.printStackTrace();
+		}
+
+	}
+}
+hostname: HUAWEI
+thread: pool-1-thread-3
+type: regular
+sizeKb: 4.809
+creationTime: 2022-02-03T15:30:52.412446Z
+lastAccessTime: 2022-03-27T20:20:34.729683Z
+lastModifiedTime: 2022-02-03T15:30:52.412446Z
+creationTimeLucene: 20220203153052412
+lastAccessTimeLucene: 20220327202034729
+lastModifiedTimeLucene: 20220203153052412
+onlyTopLines: 
+package simpleindexing;
+
+import java.io.IOException;
+import java.nio.file.Paths;
+
+import org.apache.lucene.analysis.en.EnglishAnalyzer;
+import org.apache.lucene.document.Document;
+onlyBottomLines: 
+	}
+}
+------------------------------
+Documento 15
+path: /home/jorge/apuntes/current/ri/practicas/ri-mvn/src/main/java/simpledemo/SearchFiles.java
+contentsStored: 
+package simpledemo;
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+
+import org.apache.lucene.analysis.Analyzer;
+import org.apache.lucene.analysis.standard.StandardAnalyzer;
+import org.apache.lucene.demo.knn.DemoEmbeddings;
+import org.apache.lucene.demo.knn.KnnVectorDict;
+import org.apache.lucene.document.Document;
+import org.apache.lucene.index.DirectoryReader;
+import org.apache.lucene.index.Term;
+import org.apache.lucene.queryparser.classic.QueryParser;
+import org.apache.lucene.search.BooleanClause;
+import org.apache.lucene.search.BooleanQuery;
+import org.apache.lucene.search.IndexSearcher;
+import org.apache.lucene.search.KnnVectorQuery;
+import org.apache.lucene.search.Query;
+import org.apache.lucene.search.QueryVisitor;
+import org.apache.lucene.search.ScoreDoc;
+import org.apache.lucene.search.TopDocs;
+import org.apache.lucene.store.FSDirectory;
+
+/** Simple command-line based search demo. */
+public class SearchFiles {
+
+	private SearchFiles() {
+	}
+
+	/** Simple command-line based search demo. */
+	public static void main(String[] args) throws Exception {
+		String usage = "Usage:\tjava org.apache.lucene.demo.SearchFiles [-index dir] [-field f] [-repeat n] [-queries file] [-query string] [-raw] [-paging hitsPerPage] [-knn_vector knnHits]\n\nSee http://lucene.apache.org/core/9_0_0/demo/ for details.";
+		if (args.length > 0 && ("-h".equals(args[0]) || "-help".equals(args[0]))) {
+			System.out.println(usage);
+			System.exit(0);
+		}
+
+		String index = "index";
+		String field = "contents";
+		String queries = null;
+		int repeat = 0;
+		boolean raw = false;
+		int knnVectors = 0;
+		String queryString = null;
+		int hitsPerPage = 10;
+
+		for (int i = 0; i < args.length; i++) {
+			switch (args[i]) {
+			case "-index":
+				index = args[++i];
+				break;
+			case "-field":
+				field = args[++i];
+				break;
+			case "-queries":
+				queries = args[++i];
+				break;
+			case "-query":
+				queryString = args[++i];
+				break;
+			case "-repeat":
+				repeat = Integer.parseInt(args[++i]);
+				break;
+			case "-raw":
+				raw = true;
+				break;
+			case "-paging":
+				hitsPerPage = Integer.parseInt(args[++i]);
+				if (hitsPerPage <= 0) {
+					System.err.println("There must be at least 1 hit per page.");
+					System.exit(1);
+				}
+				break;
+			case "-knn_vector":
+				knnVectors = Integer.parseInt(args[++i]);
+				break;
+			default:
+				System.err.println("Unknown argument: " + args[i]);
+				System.exit(1);
+			}
+		}
+
+		DirectoryReader reader = DirectoryReader.open(FSDirectory.open(Paths.get(index)));
+		IndexSearcher searcher = new IndexSearcher(reader);
+		Analyzer analyzer = new StandardAnalyzer();
+		KnnVectorDict vectorDict = null;
+		if (knnVectors > 0) {
+			vectorDict = new KnnVectorDict(reader.directory(), IndexFiles.KNN_DICT);
+		}
+		BufferedReader in;
+		if (queries != null) {
+			in = Files.newBufferedReader(Paths.get(queries), StandardCharsets.UTF_8);
+		} else {
+			in = new BufferedReader(new InputStreamReader(System.in, StandardCharsets.UTF_8));
+		}
+		QueryParser parser = new QueryParser(field, analyzer);
+		while (true) {
+			if (queries == null && queryString == null) { // prompt the user
+				System.out.println("Enter query: ");
+			}
+
+			String line = queryString != null ? queryString : in.readLine();
+
+			if (line == null || line.length() == -1) {
+				break;
+			}
+
+			line = line.trim();
+			if (line.length() == 0) {
+				break;
+			}
+
+			Query query = parser.parse(line);
+			if (knnVectors > 0) {
+				query = addSemanticQuery(query, vectorDict, knnVectors);
+			}
+			System.out.println("Searching for: " + query.toString(field));
+
+			if (repeat > 0) { // repeat & time as benchmark
+				Date start = new Date();
+				for (int i = 0; i < repeat; i++) {
+					searcher.search(query, 100);
+				}
+				Date end = new Date();
+				System.out.println("Time: " + (end.getTime() - start.getTime()) + "ms");
+			}
+
+			doPagingSearch(in, searcher, query, hitsPerPage, raw, queries == null && queryString == null);
+
+			if (queryString != null) {
+				break;
+			}
+		}
+		if (vectorDict != null) {
+			vectorDict.close();
+		}
+		reader.close();
+	}
+
+	/**
+	 * This demonstrates a typical paging search scenario, where the search engine
+	 * presents pages of size n to the user. The user can then go to the next page
+	 * if interested in the next hits.
+	 *
+	 * <p>
+	 * When the query is executed for the first time, then only enough results are
+	 * collected to fill 5 result pages. If the user wants to page beyond this
+	 * limit, then the query is executed another time and all hits are collected.
+	 */
+	public static void doPagingSearch(BufferedReader in, IndexSearcher searcher, Query query, int hitsPerPage,
+			boolean raw, boolean interactive) throws IOException {
+
+		// Collect enough docs to show 5 pages
+		TopDocs results = searcher.search(query, 5 * hitsPerPage);
+		ScoreDoc[] hits = results.scoreDocs;
+
+		int numTotalHits = Math.toIntExact(results.totalHits.value);
+		System.out.println(numTotalHits + " total matching documents");
+
+		int start = 0;
+		int end = Math.min(numTotalHits, hitsPerPage);
+
+		while (true) {
+			if (end > hits.length) {
+				System.out.println("Only results 1 - " + hits.length + " of " + numTotalHits
+						+ " total matching documents collected.");
+				System.out.println("Collect more (y/n) ?");
+				String line = in.readLine();
+				if (line.length() == 0 || line.charAt(0) == 'n') {
+					break;
+				}
+
+				hits = searcher.search(query, numTotalHits).scoreDocs;
+			}
+
+			end = Math.min(hits.length, start + hitsPerPage);
+
+			for (int i = start; i < end; i++) {
+				if (raw) { // output raw format
+					System.out.println("doc=" + hits[i].doc + " score=" + hits[i].score);
+					continue;
+				}
+
+				Document doc = searcher.doc(hits[i].doc);
+				String path = doc.get("path");
+				if (path != null) {
+					System.out.println((i + 1) + ". " + path);
+					String title = doc.get("title");
+					if (title != null) {
+						System.out.println("   Title: " + doc.get("title"));
+					}
+				} else {
+					System.out.println((i + 1) + ". " + "No path for this document");
+				}
+			}
+
+			if (!interactive || end == 0) {
+				break;
+			}
+
+			if (numTotalHits >= end) {
+				boolean quit = false;
+				while (true) {
+					System.out.print("Press ");
+					if (start - hitsPerPage >= 0) {
+						System.out.print("(p)revious page, ");
+					}
+					if (start + hitsPerPage < numTotalHits) {
+						System.out.print("(n)ext page, ");
+					}
+					System.out.println("(q)uit or enter number to jump to a page.");
+
+					String line = in.readLine();
+					if (line.length() == 0 || line.charAt(0) == 'q') {
+						quit = true;
+						break;
+					}
+					if (line.charAt(0) == 'p') {
+						start = Math.max(0, start - hitsPerPage);
+						break;
+					} else if (line.charAt(0) == 'n') {
+						if (start + hitsPerPage < numTotalHits) {
+							start += hitsPerPage;
+						}
+						break;
+					} else {
+						int page = Integer.parseInt(line);
+						if ((page - 1) * hitsPerPage < numTotalHits) {
+							start = (page - 1) * hitsPerPage;
+							break;
+						} else {
+							System.out.println("No such page");
+						}
+					}
+				}
+				if (quit)
+					break;
+				end = Math.min(numTotalHits, start + hitsPerPage);
+			}
+		}
+	}
+
+	private static Query addSemanticQuery(Query query, KnnVectorDict vectorDict, int k) throws IOException {
+		StringBuilder semanticQueryText = new StringBuilder();
+		QueryFieldTermExtractor termExtractor = new QueryFieldTermExtractor("contents");
+		query.visit(termExtractor);
+		for (String term : termExtractor.terms) {
+			semanticQueryText.append(term).append(' ');
+		}
+		if (semanticQueryText.length() > 0) {
+			KnnVectorQuery knnQuery = new KnnVectorQuery("contents-vector",
+					new DemoEmbeddings(vectorDict).computeEmbedding(semanticQueryText.toString()), k);
+			BooleanQuery.Builder builder = new BooleanQuery.Builder();
+			builder.add(query, BooleanClause.Occur.SHOULD);
+			builder.add(knnQuery, BooleanClause.Occur.SHOULD);
+			return builder.build();
+		}
+		return query;
+	}
+
+	private static class QueryFieldTermExtractor extends QueryVisitor {
+		private final String field;
+		private final List<String> terms = new ArrayList<>();
+
+		QueryFieldTermExtractor(String field) {
+			this.field = field;
+		}
+
+		@Override
+		public boolean acceptField(String field) {
+			return field.equals(this.field);
+		}
+
+		@Override
+		public void consumeTerms(Query query, Term... terms) {
+			for (Term term : terms) {
+				this.terms.add(term.text());
+			}
+		}
+
+		@Override
+		public QueryVisitor getSubVisitor(BooleanClause.Occur occur, Query parent) {
+			if (occur == BooleanClause.Occur.MUST_NOT) {
+				return QueryVisitor.EMPTY_VISITOR;
+			}
+			return this;
+		}
+	}
+}
+hostname: HUAWEI
+thread: pool-1-thread-3
+type: regular
+sizeKb: 9.599
+creationTime: 2022-02-03T15:30:52.412446Z
+lastAccessTime: 2022-03-27T20:20:34.71302Z
+lastModifiedTime: 2022-02-03T15:30:52.412446Z
+creationTimeLucene: 20220203153052412
+lastAccessTimeLucene: 20220327202034713
+lastModifiedTimeLucene: 20220203153052412
+onlyTopLines: 
+package simpledemo;
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+onlyBottomLines: 
+	}
+}
+------------------------------
+Documento 16
+path: /home/jorge/apuntes/current/ri/practicas/ri-mvn/src/main/java/simpledemo/SimpleDemo2.java
+contentsStored: 
+package simpledemo;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+
+import org.apache.lucene.analysis.Analyzer;
+import org.apache.lucene.analysis.standard.StandardAnalyzer;
+import org.apache.lucene.document.Document;
+import org.apache.lucene.document.Field;
+import org.apache.lucene.document.TextField;
+import org.apache.lucene.index.DirectoryReader;
+import org.apache.lucene.index.IndexWriter;
+import org.apache.lucene.index.IndexWriterConfig;
+import org.apache.lucene.queryparser.classic.ParseException;
+import org.apache.lucene.queryparser.classic.QueryParser;
+import org.apache.lucene.search.IndexSearcher;
+import org.apache.lucene.search.Query;
+import org.apache.lucene.search.ScoreDoc;
+import org.apache.lucene.search.similarities.LMJelinekMercerSimilarity;
+import org.apache.lucene.store.Directory;
+import org.apache.lucene.store.FSDirectory;
+
+public class SimpleDemo2 {
+
+	/**
+	 * @param args
+	 * @throws IOException
+	 * @throws ParseException
+	 */
+	public static void main(String[] args) throws IOException, ParseException {
+		Analyzer analyzer = new StandardAnalyzer();
+
+		Path indexPath = Files.createTempDirectory("tempIndex");
+		Directory directory = FSDirectory.open(indexPath);
+		IndexWriterConfig config = new IndexWriterConfig(analyzer);
+
+		float lambda = (float) 1.0;
+		LMJelinekMercerSimilarity similarity = new LMJelinekMercerSimilarity(lambda);
+		config.setSimilarity(similarity);
+
+		IndexWriter iwriter = new IndexWriter(directory, config);
+
+		Document doc1 = new Document();
+		String text1 = "This is the text to be indexed.";
+		doc1.add(new Field("fieldname", text1, TextField.TYPE_STORED));
+
+		Document doc2 = new Document();
+		String text2 = "This is document to be indexed.";
+		doc2.add(new Field("fieldname", text2, TextField.TYPE_STORED));
+
+		Document doc3 = new Document();
+		String text3 = "This is document to be indexed.";
+		doc3.add(new Field("fieldname", text3, TextField.TYPE_STORED));
+
+		iwriter.addDocument(doc1);
+		iwriter.addDocument(doc2);
+		iwriter.addDocument(doc3);
+
+		iwriter.close();
+
+		// Now search the index:
+		DirectoryReader ireader = DirectoryReader.open(directory);
+		IndexSearcher isearcher = new IndexSearcher(ireader);
+		// Parse a simple query that searches for "text":
+		QueryParser parser = new QueryParser("fieldname", analyzer);
+		Query query = parser.parse("text");
+		ScoreDoc[] hits = isearcher.search(query, 1000).scoreDocs;
+		assertEquals(1, hits.length);
+		// Iterate through the results:
+		for (int i = 0; i < hits.length; i++) {
+			Document hitDoc = isearcher.doc(hits[i].doc);
+			/**
+			 * assertEquals("This is not the text that was indexed.",
+			 * hitDoc.get("fieldname"));
+			 */
+			assertEquals("This is the text to be indexed.", hitDoc.get("fieldname"));
+		}
+		ireader.close();
+		directory.close();
+		// IOUtils.rm(indexPath);
+	}
+
+}
+hostname: HUAWEI
+thread: pool-1-thread-3
+type: regular
+sizeKb: 2.906
+creationTime: 2022-02-03T15:30:52.412446Z
+lastAccessTime: 2022-03-27T20:20:34.719685Z
+lastModifiedTime: 2022-02-03T15:30:52.412446Z
+creationTimeLucene: 20220203153052412
+lastAccessTimeLucene: 20220327202034719
+lastModifiedTimeLucene: 20220203153052412
+onlyTopLines: 
+package simpledemo;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+onlyBottomLines: 
+
+}
+------------------------------
+Documento 17
+path: /home/jorge/apuntes/current/ri/practicas/ri-mvn/src/main/java/simpledemo/SimpleDemo1.java
+contentsStored: 
+package simpledemo;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+
+import org.apache.lucene.analysis.Analyzer;
+import org.apache.lucene.analysis.standard.StandardAnalyzer;
+import org.apache.lucene.document.Document;
+import org.apache.lucene.document.Field;
+import org.apache.lucene.document.TextField;
+import org.apache.lucene.index.DirectoryReader;
+import org.apache.lucene.index.IndexWriter;
+import org.apache.lucene.index.IndexWriterConfig;
+import org.apache.lucene.queryparser.classic.ParseException;
+import org.apache.lucene.queryparser.classic.QueryParser;
+import org.apache.lucene.search.IndexSearcher;
+import org.apache.lucene.search.Query;
+import org.apache.lucene.search.ScoreDoc;
+import org.apache.lucene.store.Directory;
+import org.apache.lucene.store.FSDirectory;
+
+public class SimpleDemo1 {
+
+	/**
+	 * @param args
+	 * @throws IOException
+	 * @throws ParseException
+	 */
+	public static void main(String[] args) throws IOException, ParseException {
+		Analyzer analyzer = new StandardAnalyzer();
+		Path indexPath = Files.createTempDirectory("tempIndex");
+		Directory directory = FSDirectory.open(indexPath);
+		IndexWriterConfig config = new IndexWriterConfig(analyzer);
+		IndexWriter iwriter = new IndexWriter(directory, config);
+		Document doc = new Document();
+		String text = "This is the text to be indexed.";
+		doc.add(new Field("fieldname", text, TextField.TYPE_STORED));
+		iwriter.addDocument(doc);
+		iwriter.close();
+
+		// Now search the index:
+		DirectoryReader ireader = DirectoryReader.open(directory);
+		IndexSearcher isearcher = new IndexSearcher(ireader);
+		// Parse a simple query that searches for "text":
+		QueryParser parser = new QueryParser("fieldname", analyzer);
+		Query query = parser.parse("text");
+		ScoreDoc[] hits = isearcher.search(query, 1000).scoreDocs;
+		assertEquals(1, hits.length);
+		// Iterate through the results:
+		for (int i = 0; i < hits.length; i++) {
+			Document hitDoc = isearcher.doc(hits[i].doc);
+			/**
+			 * assertEquals("This is not the text that was indexed.",
+			 * hitDoc.get("fieldname"));
+			 */
+			assertEquals("This is the text to be indexed.", hitDoc.get("fieldname"));
+		}
+		ireader.close();
+		directory.close();
+		/**
+		 * IOUtils.rm(indexPath);
+		 */
+	}
+
+}
+hostname: HUAWEI
+thread: pool-1-thread-3
+type: regular
+sizeKb: 2.325
+creationTime: 2022-02-03T15:30:52.412446Z
+lastAccessTime: 2022-03-27T20:20:34.719685Z
+lastModifiedTime: 2022-02-03T15:30:52.412446Z
+creationTimeLucene: 20220203153052412
+lastAccessTimeLucene: 20220327202034719
+lastModifiedTimeLucene: 20220203153052412
+onlyTopLines: 
+package simpledemo;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+onlyBottomLines: 
+
+}
+------------------------------
+Documento 18
+path: /home/jorge/apuntes/current/ri/practicas/ri-mvn/src/main/java/simpledemo/IndexFiles.java
+contentsStored: 
+package simpledemo;
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.FileVisitResult;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.util.Date;
+
+import org.apache.lucene.analysis.Analyzer;
+import org.apache.lucene.analysis.standard.StandardAnalyzer;
+import org.apache.lucene.demo.knn.DemoEmbeddings;
+import org.apache.lucene.demo.knn.KnnVectorDict;
+import org.apache.lucene.document.Document;
+import org.apache.lucene.document.Field;
+import org.apache.lucene.document.KnnVectorField;
+import org.apache.lucene.document.LongPoint;
+import org.apache.lucene.document.StringField;
+import org.apache.lucene.document.TextField;
+import org.apache.lucene.index.DirectoryReader;
+import org.apache.lucene.index.IndexReader;
+import org.apache.lucene.index.IndexWriter;
+import org.apache.lucene.index.IndexWriterConfig;
+import org.apache.lucene.index.IndexWriterConfig.OpenMode;
+import org.apache.lucene.index.Term;
+import org.apache.lucene.index.VectorSimilarityFunction;
+import org.apache.lucene.store.Directory;
+import org.apache.lucene.store.FSDirectory;
+import org.apache.lucene.util.IOUtils;
+
+/**
+ * Index all text files under a directory.
+ *
+ * <p>
+ * This is a command-line application demonstrating simple Lucene indexing. Run
+ * it with no command-line arguments for usage information.
+ */
+public class IndexFiles implements AutoCloseable {
+	static final String KNN_DICT = "knn-dict";
+
+	// Calculates embedding vectors for KnnVector search
+	private final DemoEmbeddings demoEmbeddings;
+	private final KnnVectorDict vectorDict;
+
+	private IndexFiles(KnnVectorDict vectorDict) throws IOException {
+		if (vectorDict != null) {
+			this.vectorDict = vectorDict;
+			demoEmbeddings = new DemoEmbeddings(vectorDict);
+		} else {
+			this.vectorDict = null;
+			demoEmbeddings = null;
+		}
+	}
+
+	/** Index all text files under a directory. */
+	public static void main(String[] args) throws Exception {
+		String usage = "java org.apache.lucene.demo.IndexFiles"
+				+ " [-index INDEX_PATH] [-docs DOCS_PATH] [-update] [-knn_dict DICT_PATH]\n\n"
+				+ "This indexes the documents in DOCS_PATH, creating a Lucene index"
+				+ "in INDEX_PATH that can be searched with SearchFiles\n"
+				+ "IF DICT_PATH contains a KnnVector dictionary, the index will also support KnnVector search";
+		String indexPath = "index";
+		String docsPath = null;
+		String vectorDictSource = null;
+		boolean create = true;
+		for (int i = 0; i < args.length; i++) {
+			switch (args[i]) {
+			case "-index":
+				indexPath = args[++i];
+				break;
+			case "-docs":
+				docsPath = args[++i];
+				break;
+			case "-knn_dict":
+				vectorDictSource = args[++i];
+				break;
+			case "-update":
+				create = false;
+				break;
+			case "-create":
+				create = true;
+				break;
+			default:
+				throw new IllegalArgumentException("unknown parameter " + args[i]);
+			}
+		}
+
+		if (docsPath == null) {
+			System.err.println("Usage: " + usage);
+			System.exit(1);
+		}
+
+		final Path docDir = Paths.get(docsPath);
+		if (!Files.isReadable(docDir)) {
+			System.out.println("Document directory '" + docDir.toAbsolutePath()
+					+ "' does not exist or is not readable, please check the path");
+			System.exit(1);
+		}
+
+		Date start = new Date();
+		try {
+			System.out.println("Indexing to directory '" + indexPath + "'...");
+
+			Directory dir = FSDirectory.open(Paths.get(indexPath));
+			Analyzer analyzer = new StandardAnalyzer();
+			IndexWriterConfig iwc = new IndexWriterConfig(analyzer);
+
+			if (create) {
+				// Create a new index in the directory, removing any
+				// previously indexed documents:
+				iwc.setOpenMode(OpenMode.CREATE);
+			} else {
+				// Add new documents to an existing index:
+				iwc.setOpenMode(OpenMode.CREATE_OR_APPEND);
+			}
+
+			// Optional: for better indexing performance, if you
+			// are indexing many documents, increase the RAM
+			// buffer. But if you do this, increase the max heap
+			// size to the JVM (eg add -Xmx512m or -Xmx1g):
+			//
+			// iwc.setRAMBufferSizeMB(256.0);
+
+			KnnVectorDict vectorDictInstance = null;
+			long vectorDictSize = 0;
+			if (vectorDictSource != null) {
+				KnnVectorDict.build(Paths.get(vectorDictSource), dir, KNN_DICT);
+				vectorDictInstance = new KnnVectorDict(dir, KNN_DICT);
+				vectorDictSize = vectorDictInstance.ramBytesUsed();
+			}
+
+			try (IndexWriter writer = new IndexWriter(dir, iwc);
+					IndexFiles indexFiles = new IndexFiles(vectorDictInstance)) {
+				indexFiles.indexDocs(writer, docDir);
+
+				// NOTE: if you want to maximize search performance,
+				// you can optionally call forceMerge here. This can be
+				// a terribly costly operation, so generally it's only
+				// worth it when your index is relatively static (ie
+				// you're done adding documents to it):
+				//
+				// writer.forceMerge(1);
+			} finally {
+				IOUtils.close(vectorDictInstance);
+			}
+
+			Date end = new Date();
+			try (IndexReader reader = DirectoryReader.open(dir)) {
+				System.out.println("Indexed " + reader.numDocs() + " documents in " + (end.getTime() - start.getTime())
+						+ " milliseconds");
+				if (reader.numDocs() > 100 && vectorDictSize < 1_000_000 && System.getProperty("smoketester") == null) {
+					throw new RuntimeException(
+							"Are you (ab)using the toy vector dictionary? See the package javadocs to understand why you got this exception.");
+				}
+			}
+		} catch (IOException e) {
+			System.out.println(" caught a " + e.getClass() + "\n with message: " + e.getMessage());
+		}
+	}
+
+	/**
+	 * Indexes the given file using the given writer, or if a directory is given,
+	 * recurses over files and directories found under the given directory.
+	 *
+	 * <p>
+	 * NOTE: This method indexes one document per input file. This is slow. For good
+	 * throughput, put multiple documents into your input file(s). An example of
+	 * this is in the benchmark module, which can create "line doc" files, one
+	 * document per line, using the <a href=
+	 * "../../../../../contrib-benchmark/org/apache/lucene/benchmark/byTask/tasks/WriteLineDocTask.html"
+	 * >WriteLineDocTask</a>.
+	 *
+	 * @param writer Writer to the index where the given file/dir info will be
+	 *               stored
+	 * @param path   The file to index, or the directory to recurse into to find
+	 *               files to indt
+	 * @throws IOException If there is a low-level I/O error
+	 */
+	void indexDocs(final IndexWriter writer, Path path) throws IOException {
+		if (Files.isDirectory(path)) {
+			Files.walkFileTree(path, new SimpleFileVisitor<Path>() {
+				@Override
+				public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
+					try {
+						indexDoc(writer, file, attrs.lastModifiedTime().toMillis());
+					} catch (@SuppressWarnings("unused") IOException ignore) {
+						ignore.printStackTrace(System.err);
+						// don't index files that can't be read.
+					}
+					return FileVisitResult.CONTINUE;
+				}
+			});
+		} else {
+			indexDoc(writer, path, Files.getLastModifiedTime(path).toMillis());
+		}
+	}
+
+	/** Indexes a single document */
+	void indexDoc(IndexWriter writer, Path file, long lastModified) throws IOException {
+		try (InputStream stream = Files.newInputStream(file)) {
+			// make a new, empty document
+			Document doc = new Document();
+
+			// Add the path of the file as a field named "path". Use a
+			// field that is indexed (i.e. searchable), but don't tokenize
+			// the field into separate words and don't index term frequency
+			// or positional information:
+			Field pathField = new StringField("path", file.toString(), Field.Store.YES);
+			doc.add(pathField);
+
+			// Add the last modified date of the file a field named "modified".
+			// Use a LongPoint that is indexed (i.e. efficiently filterable with
+			// PointRangeQuery). This indexes to milli-second resolution, which
+			// is often too fine. You could instead create a number based on
+			// year/month/day/hour/minutes/seconds, down the resolution you require.
+			// For example the long value 2011021714 would mean
+			// February 17, 2011, 2-3 PM.
+			doc.add(new LongPoint("modified", lastModified));
+
+			// Add the contents of the file to a field named "contents". Specify a Reader,
+			// so that the text of the file is tokenized and indexed, but not stored.
+			// Note that FileReader expects the file to be in UTF-8 encoding.
+			// If that's not the case searching for special characters will fail.
+			doc.add(new TextField("contents",
+					new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8))));
+
+			if (demoEmbeddings != null) {
+				try (InputStream in = Files.newInputStream(file)) {
+					float[] vector = demoEmbeddings
+							.computeEmbedding(new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8)));
+					doc.add(new KnnVectorField("contents-vector", vector, VectorSimilarityFunction.DOT_PRODUCT));
+				}
+			}
+
+			if (writer.getConfig().getOpenMode() == OpenMode.CREATE) {
+				// New index, so we just add the document (no old document can be there):
+				System.out.println("adding " + file);
+				writer.addDocument(doc);
+			} else {
+				// Existing index (an old copy of this document may have been indexed) so
+				// we use updateDocument instead to replace the old one matching the exact
+				// path, if present:
+				System.out.println("updating " + file);
+				writer.updateDocument(new Term("path", file.toString()), doc);
+			}
+		}
+	}
+
+	@Override
+	public void close() throws IOException {
+		IOUtils.close(vectorDict);
+	}
+}
+hostname: HUAWEI
+thread: pool-1-thread-3
+type: regular
+sizeKb: 10.413
+creationTime: 2022-03-02T13:00:38.420131Z
+lastAccessTime: 2022-03-27T20:20:34.709687Z
+lastModifiedTime: 2022-03-02T13:00:38.420131Z
+creationTimeLucene: 20220302130038420
+lastAccessTimeLucene: 20220327202034709
+lastModifiedTimeLucene: 20220302130038420
+onlyTopLines: 
+package simpledemo;
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+onlyBottomLines: 
+	}
+}
+------------------------------
+Documento 19
+path: /home/jorge/apuntes/current/rcra/practicas/hitori/examples/solution6.txt
+contentsStored: 
+*2a7*5*c*38*
+761*c245ba*3
+8*71*c9*4*25
+49*35*b1*27*
+*82*69a*37c4
+ab96*832c*57
+*4*a8*7*61*9
+5*4c*a*8793*
+63*9ab8*5c*1
+9538b*271*ac
+2*5*37*4*6*b
+*7b4*3c9286a
+hostname: HUAWEI
+thread: pool-1-thread-5
+type: regular
+sizeKb: 0.156
+creationTime: 2022-03-03T16:38:23.606479Z
+lastAccessTime: 2022-03-27T20:20:34.693023Z
+lastModifiedTime: 2022-03-03T16:38:23.606479Z
+creationTimeLucene: 20220303163823606
+lastAccessTimeLucene: 20220327202034693
+lastModifiedTimeLucene: 20220303163823606
+onlyTopLines: 
+*2a7*5*c*38*
+761*c245ba*3
+8*71*c9*4*25
+49*35*b1*27*
+*82*69a*37c4
+ab96*832c*57
+*4*a8*7*61*9
+onlyBottomLines: 
+2*5*37*4*6*b
+*7b4*3c9286a
+------------------------------
+Documento 20
+path: /home/jorge/apuntes/current/rcra/practicas/hitori/examples/solution4.txt
+contentsStored: 
+421*8*5*
+8*713425
+*685*27*
+6*572*38
+51*3*7*2
+*34*1586
+7*34*16*
+35287641
+hostname: HUAWEI
+thread: pool-1-thread-5
+type: regular
+sizeKb: 0.072
+creationTime: 2022-02-21T10:56:35.347474Z
+lastAccessTime: 2022-03-27T20:20:34.693023Z
+lastModifiedTime: 2022-02-21T10:56:35.347474Z
+creationTimeLucene: 20220221105635347
+lastAccessTimeLucene: 20220327202034693
+lastModifiedTimeLucene: 20220221105635347
+onlyTopLines: 
+421*8*5*
+8*713425
+*685*27*
+6*572*38
+51*3*7*2
+*34*1586
+7*34*16*
+onlyBottomLines: 
+7*34*16*
+35287641
+------------------------------
+Documento 21
+path: /home/jorge/apuntes/current/rcra/practicas/hitori/examples/hitori3.txt
+contentsStored: 
+45341
+11452
+44143
+52245
+41534
+hostname: HUAWEI
+thread: pool-1-thread-5
+type: regular
+sizeKb: 0.03
+creationTime: 2022-02-21T10:47:40.414226Z
+lastAccessTime: 2022-03-27T20:20:34.686358Z
+lastModifiedTime: 2022-02-21T10:47:40.414226Z
+creationTimeLucene: 20220221104740414
+lastAccessTimeLucene: 20220327202034686
+lastModifiedTimeLucene: 20220221104740414
+onlyTopLines: 
+45341
+11452
+44143
+52245
+41534
+onlyBottomLines: 
+52245
+41534
+------------------------------
+Documento 22
+path: /home/jorge/apuntes/current/rcra/practicas/hitori/examples/hitori1.txt
+contentsStored: 
+11214
+15543
+14132
+25335
+42511
+hostname: HUAWEI
+thread: pool-1-thread-5
+type: regular
+sizeKb: 0.03
+creationTime: 2022-02-19T20:25:48.390971Z
+lastAccessTime: 2022-03-27T20:20:34.686358Z
+lastModifiedTime: 2022-02-19T20:25:48.390971Z
+creationTimeLucene: 20220219202548390
+lastAccessTimeLucene: 20220327202034686
+lastModifiedTimeLucene: 20220219202548390
+onlyTopLines: 
+11214
+15543
+14132
+25335
+42511
+onlyBottomLines: 
+25335
+42511
+------------------------------
+Documento 23
+path: /home/jorge/apuntes/current/rcra/practicas/hitori/examples/solution2.txt
+contentsStored: No solution
+hostname: HUAWEI
+thread: pool-1-thread-5
+type: regular
+sizeKb: 0.012
+creationTime: 2022-02-21T10:56:26.597364Z
+lastAccessTime: 2022-03-27T20:20:34.693023Z
+lastModifiedTime: 2022-02-21T10:56:26.597364Z
+creationTimeLucene: 20220221105626597
+lastAccessTimeLucene: 20220327202034693
+lastModifiedTimeLucene: 20220221105626597
+onlyTopLines: No solution
+onlyBottomLines: No solution
+------------------------------
+Documento 24
+path: /home/jorge/apuntes/current/rcra/practicas/hitori/examples/hitori4.txt
+contentsStored: 
+42148454
+82713425
+86853275
+62572338
+51132712
+63441586
+73343161
+35287641
+hostname: HUAWEI
+thread: pool-1-thread-5
+type: regular
+sizeKb: 0.072
+creationTime: 2022-02-21T10:47:52.521034Z
+lastAccessTime: 2022-03-27T20:20:34.686358Z
+lastModifiedTime: 2022-02-21T10:47:52.521034Z
+creationTimeLucene: 20220221104752521
+lastAccessTimeLucene: 20220327202034686
+lastModifiedTimeLucene: 20220221104752521
+onlyTopLines: 
+42148454
+82713425
+86853275
+62572338
+51132712
+63441586
+73343161
+onlyBottomLines: 
+73343161
+35287641
+------------------------------
+Documento 25
+path: /home/jorge/apuntes/current/rcra/practicas/hitori/examples/hitori6.txt
+contentsStored: 
+22a7757ca38c
+7616c245ba83
+82717c984a25
+49a352b19271
+882869ac37c4
+ab965832c257
+441a847c6119
+524c5a98793c
+6339ab815c31
+9538b92713ac
+2855377456ab
+67b4c3c9286a
+hostname: HUAWEI
+thread: pool-1-thread-5
+type: regular
+sizeKb: 0.156
+creationTime: 2022-03-03T16:31:51.240806Z
+lastAccessTime: 2022-03-27T20:20:34.693023Z
+lastModifiedTime: 2022-03-03T16:31:51.240806Z
+creationTimeLucene: 20220303163151240
+lastAccessTimeLucene: 20220327202034693
+lastModifiedTimeLucene: 20220303163151240
+onlyTopLines: 
+22a7757ca38c
+7616c245ba83
+82717c984a25
+49a352b19271
+882869ac37c4
+ab965832c257
+441a847c6119
+onlyBottomLines: 
+2855377456ab
+67b4c3c9286a
+------------------------------
+Documento 26
+path: /home/jorge/apuntes/current/rcra/practicas/hitori/examples/solution3.txt
+contentsStored: 
+453*1
+1*452
+*41*3
+52*4*
+*1534
+hostname: HUAWEI
+thread: pool-1-thread-5
+type: regular
+sizeKb: 0.03
+creationTime: 2022-02-21T10:56:20.503954Z
+lastAccessTime: 2022-03-27T20:20:34.693023Z
+lastModifiedTime: 2022-02-21T10:56:20.503954Z
+creationTimeLucene: 20220221105620503
+lastAccessTimeLucene: 20220327202034693
+lastModifiedTimeLucene: 20220221105620503
+onlyTopLines: 
+453*1
+1*452
+*41*3
+52*4*
+*1534
+onlyBottomLines: 
+52*4*
+*1534
+------------------------------
+Documento 27
+path: /home/jorge/apuntes/current/rcra/practicas/hitori/examples/hitori5.txt
+contentsStored: 
+33638671
+87861382
+47313586
+14562627
+86853648
+68373415
+56254113
+31726558
+hostname: HUAWEI
+thread: pool-1-thread-5
+type: regular
+sizeKb: 0.072
+creationTime: 2022-03-03T16:31:37.549942Z
+lastAccessTime: 2022-03-27T20:20:34.689691Z
+lastModifiedTime: 2022-03-03T16:31:37.549942Z
+creationTimeLucene: 20220303163137549
+lastAccessTimeLucene: 20220327202034689
+lastModifiedTimeLucene: 20220303163137549
+onlyTopLines: 
+33638671
+87861382
+47313586
+14562627
+86853648
+68373415
+56254113
+onlyBottomLines: 
+56254113
+31726558
+------------------------------
+Documento 28
+path: /home/jorge/apuntes/current/rcra/practicas/hitori/examples/solution1.txt
+contentsStored: 
+*12*4
+15*43
+*4132
+2*3*5
+4251*
+hostname: HUAWEI
+thread: pool-1-thread-5
+type: regular
+sizeKb: 0.03
+creationTime: 2022-02-21T10:56:31.270756Z
+lastAccessTime: 2022-03-27T20:20:34.693023Z
+lastModifiedTime: 2022-02-21T10:56:31.270756Z
+creationTimeLucene: 20220221105631270
+lastAccessTimeLucene: 20220327202034693
+lastModifiedTimeLucene: 20220221105631270
+onlyTopLines: 
+*12*4
+15*43
+*4132
+2*3*5
+4251*
+onlyBottomLines: 
+2*3*5
+4251*
+------------------------------
+Documento 29
+path: /home/jorge/apuntes/current/rcra/practicas/hitori/examples/solution5.txt
+contentsStored: 
+*36*8*71
+87*613*2
+4*31*586
+145*26*7
+*6853*4*
+68*7*415
+5*2*41*3
+31726*58
+hostname: HUAWEI
+thread: pool-1-thread-5
+type: regular
+sizeKb: 0.072
+creationTime: 2022-03-03T16:32:32.380891Z
+lastAccessTime: 2022-03-27T20:20:34.693023Z
+lastModifiedTime: 2022-03-03T16:32:32.380891Z
+creationTimeLucene: 20220303163232380
+lastAccessTimeLucene: 20220327202034693
+lastModifiedTimeLucene: 20220303163232380
+onlyTopLines: 
+*36*8*71
+87*613*2
+4*31*586
+145*26*7
+*6853*4*
+68*7*415
+5*2*41*3
+onlyBottomLines: 
+5*2*41*3
+31726*58
+------------------------------
+Documento 30
+path: /home/jorge/apuntes/current/rcra/practicas/hitori/examples/hitori2.txt
+contentsStored: 
+11
+11
+hostname: HUAWEI
+thread: pool-1-thread-5
+type: regular
+sizeKb: 0.006
+creationTime: 2022-02-21T10:47:16.857286Z
+lastAccessTime: 2022-03-27T20:20:34.686358Z
+lastModifiedTime: 2022-02-21T10:47:16.857286Z
+creationTimeLucene: 20220221104716857
+lastAccessTimeLucene: 20220327202034686
+lastModifiedTimeLucene: 20220221104716857
+onlyTopLines: 
+11
+11
+onlyBottomLines: 
+11
+11
+------------------------------
+Documento 31
+path: /home/jorge/apuntes/current/rcra/practicas/unblock/my_solutions/sol6.txt
+contentsStored: 
+SATISFIABLE
+ State 0:
+ State 1:
+  move(g,2)
+ State 2:
+  move(e,2)
+ State 3:
+  move(a,3)
+ State 4:
+  move(d,2)
+ State 5:
+  move(f,-3)
+ State 6:
+  move(d,-2)
+ State 7:
+  move(a,-3)
+ State 8:
+  move(e,-2)
+ State 9:
+  move(g,-4)
+ State 10:
+  move(e,1)
+ State 11:
+  move(a,3)
+ State 12:
+  move(c,3)
+ State 13:
+  move(d,4)
+hostname: HUAWEI
+thread: pool-1-thread-5
+type: regular
+sizeKb: 0.317
+creationTime: 2022-03-27T21:08:30.56681Z
+lastAccessTime: 2022-03-27T22:04:27.691181Z
+lastModifiedTime: 2022-03-27T21:08:30.56681Z
+creationTimeLucene: 20220327210830566
+lastAccessTimeLucene: 20220327220427691
+lastModifiedTimeLucene: 20220327210830566
+onlyTopLines: 
+SATISFIABLE
+ State 0:
+ State 1:
+  move(g,2)
+ State 2:
+  move(e,2)
+ State 3:
+onlyBottomLines: 
+ State 13:
+  move(d,4)
+------------------------------
+Documento 32
+path: /home/jorge/apuntes/current/rcra/practicas/unblock/my_solutions/sol3.txt
+contentsStored: 
+SATISFIABLE
+ State 0:
+ State 1:
+  move(h,1)
+ State 2:
+  move(g,2)
+ State 3:
+  move(f,3)
+ State 4:
+  move(c,2)
+ State 5:
+  move(d,-1)
+ State 6:
+  move(e,-1)
+ State 7:
+  move(i,-2)
+ State 8:
+  move(f,1)
+hostname: HUAWEI
+thread: pool-1-thread-5
+type: regular
+sizeKb: 0.201
+creationTime: 2022-03-27T21:08:29.906811Z
+lastAccessTime: 2022-03-27T22:04:27.691181Z
+lastModifiedTime: 2022-03-27T21:08:29.906811Z
+creationTimeLucene: 20220327210829906
+lastAccessTimeLucene: 20220327220427691
+lastModifiedTimeLucene: 20220327210829906
+onlyTopLines: 
+SATISFIABLE
+ State 0:
+ State 1:
+  move(h,1)
+ State 2:
+  move(g,2)
+ State 3:
+onlyBottomLines: 
+ State 8:
+  move(f,1)
+------------------------------
+Documento 33
+path: /home/jorge/apuntes/current/rcra/practicas/unblock/my_solutions/sol8.txt
+contentsStored: 
+SATISFIABLE
+ State 0:
+ State 1:
+  move(l,-1)
+ State 2:
+  move(j,-1)
+ State 3:
+  move(f,2)
+ State 4:
+  move(b,2)
+ State 5:
+  move(a,4)
+ State 6:
+  move(c,3)
+ State 7:
+  move(e,-2)
+ State 8:
+  move(d,1)
+ State 9:
+  move(g,1)
+ State 10:
+  move(i,-4)
+ State 11:
+  move(j,-1)
+ State 12:
+  move(l,-1)
+ State 13:
+  move(g,-1)
+ State 14:
+  move(d,-1)
+ State 15:
+  move(e,4)
+ State 16:
+  move(g,1)
+ State 17:
+  move(d,1)
+ State 18:
+  move(i,2)
+ State 19:
+  move(c,-3)
+ State 20:
+  move(b,-2)
+ State 21:
+  move(d,3)
+hostname: HUAWEI
+thread: pool-1-thread-5
+type: regular
+sizeKb: 0.506
+creationTime: 2022-03-27T21:08:31.760142Z
+lastAccessTime: 2022-03-27T21:10:18.626731Z
+lastModifiedTime: 2022-03-27T21:08:31.760142Z
+creationTimeLucene: 20220327210831760
+lastAccessTimeLucene: 20220327211018626
+lastModifiedTimeLucene: 20220327210831760
+onlyTopLines: 
+SATISFIABLE
+ State 0:
+ State 1:
+  move(l,-1)
+ State 2:
+  move(j,-1)
+ State 3:
+onlyBottomLines: 
+ State 21:
+  move(d,3)
+------------------------------
+Documento 34
+path: /home/jorge/apuntes/current/rcra/practicas/unblock/my_solutions/sol5.txt
+contentsStored: 
+SATISFIABLE
+ State 0:
+ State 1:
+  move(a,-1)
+ State 2:
+  move(d,3)
+ State 3:
+  move(g,1)
+ State 4:
+  move(b,4)
+ State 5:
+  move(c,2)
+ State 6:
+  move(f,-2)
+ State 7:
+  move(e,4)
+hostname: HUAWEI
+thread: pool-1-thread-5
+type: regular
+sizeKb: 0.178
+creationTime: 2022-03-27T21:08:30.293477Z
+lastAccessTime: 2022-03-27T22:04:27.691181Z
+lastModifiedTime: 2022-03-27T21:08:30.293477Z
+creationTimeLucene: 20220327210830293
+lastAccessTimeLucene: 20220327220427691
+lastModifiedTimeLucene: 20220327210830293
+onlyTopLines: 
+SATISFIABLE
+ State 0:
+ State 1:
+  move(a,-1)
+ State 2:
+  move(d,3)
+ State 3:
+onlyBottomLines: 
+ State 7:
+  move(e,4)
+------------------------------
+Documento 35
+path: /home/jorge/apuntes/current/rcra/practicas/unblock/my_solutions/sol1.txt
+contentsStored: 
+SATISFIABLE
+ State 0:
+ State 1:
+  move(b,1)
+ State 2:
+  move(c,-4)
+ State 3:
+  move(d,-2)
+ State 4:
+  move(e,1)
+ State 5:
+  move(a,3)
+ State 6:
+  move(b,3)
+hostname: HUAWEI
+thread: pool-1-thread-5
+type: regular
+sizeKb: 0.156
+creationTime: 2022-03-27T21:08:29.546812Z
+lastAccessTime: 2022-03-27T22:04:27.691181Z
+lastModifiedTime: 2022-03-27T21:08:29.546812Z
+creationTimeLucene: 20220327210829546
+lastAccessTimeLucene: 20220327220427691
+lastModifiedTimeLucene: 20220327210829546
+onlyTopLines: 
+SATISFIABLE
+ State 0:
+ State 1:
+  move(b,1)
+ State 2:
+  move(c,-4)
+ State 3:
+onlyBottomLines: 
+ State 6:
+  move(b,3)
+------------------------------
+Documento 36
+path: /home/jorge/apuntes/current/rcra/practicas/unblock/my_solutions/sol10.txt
+contentsStored: 
+SATISFIABLE
+ State 0:
+ State 1:
+  move(a,1)
+ State 2:
+  move(b,-1)
+ State 3:
+  move(e,-1)
+ State 4:
+  move(i,-1)
+ State 5:
+  move(j,3)
+ State 6:
+  move(i,1)
+ State 7:
+  move(d,2)
+ State 8:
+  move(g,-2)
+ State 9:
+  move(c,2)
+ State 10:
+  move(f,-1)
+ State 11:
+  move(h,-2)
+ State 12:
+  move(k,-1)
+ State 13:
+  move(l,3)
+ State 14:
+  move(a,2)
+ State 15:
+  move(i,1)
+ State 16:
+  move(g,-1)
+ State 17:
+  move(e,2)
+ State 18:
+  move(f,-3)
+ State 19:
+  move(c,-2)
+ State 20:
+  move(e,-2)
+ State 21:
+  move(g,4)
+hostname: HUAWEI
+thread: pool-1-thread-5
+type: regular
+sizeKb: 0.507
+creationTime: 2022-03-27T21:08:33.936806Z
+lastAccessTime: 2022-03-27T22:04:27.691181Z
+lastModifiedTime: 2022-03-27T21:08:33.936806Z
+creationTimeLucene: 20220327210833936
+lastAccessTimeLucene: 20220327220427691
+lastModifiedTimeLucene: 20220327210833936
+onlyTopLines: 
+SATISFIABLE
+ State 0:
+ State 1:
+  move(a,1)
+ State 2:
+  move(b,-1)
+ State 3:
+onlyBottomLines: 
+ State 21:
+  move(g,4)
+------------------------------
+Documento 37
+path: /home/jorge/apuntes/current/rcra/practicas/unblock/my_solutions/sol2.txt
+contentsStored: 
+SATISFIABLE
+ State 0:
+ State 1:
+  move(a,1)
+ State 2:
+  move(c,-1)
+ State 3:
+  move(f,-1)
+ State 4:
+  move(g,-3)
+ State 5:
+  move(b,3)
+ State 6:
+  move(h,-2)
+ State 7:
+  move(e,2)
+ State 8:
+  move(d,3)
+hostname: HUAWEI
+thread: pool-1-thread-5
+type: regular
+sizeKb: 0.202
+creationTime: 2022-03-27T21:08:29.703478Z
+lastAccessTime: 2022-03-27T21:10:11.336733Z
+lastModifiedTime: 2022-03-27T21:08:29.703478Z
+creationTimeLucene: 20220327210829703
+lastAccessTimeLucene: 20220327211011336
+lastModifiedTimeLucene: 20220327210829703
+onlyTopLines: 
+SATISFIABLE
+ State 0:
+ State 1:
+  move(a,1)
+ State 2:
+  move(c,-1)
+ State 3:
+onlyBottomLines: 
+ State 8:
+  move(d,3)
+------------------------------
+Documento 38
+path: /home/jorge/apuntes/current/rcra/practicas/unblock/my_solutions/sol7.txt
+contentsStored: 
+SATISFIABLE
+ State 0:
+ State 1:
+  move(f,-1)
+ State 2:
+  move(i,-3)
+ State 3:
+  move(h,1)
+ State 4:
+  move(j,-1)
+ State 5:
+  move(k,-3)
+ State 6:
+  move(g,1)
+ State 7:
+  move(e,2)
+ State 8:
+  move(d,2)
+ State 9:
+  move(f,4)
+hostname: HUAWEI
+thread: pool-1-thread-5
+type: regular
+sizeKb: 0.224
+creationTime: 2022-03-27T21:08:30.753477Z
+lastAccessTime: 2022-03-27T21:11:24.673403Z
+lastModifiedTime: 2022-03-27T21:08:30.753477Z
+creationTimeLucene: 20220327210830753
+lastAccessTimeLucene: 20220327211124673
+lastModifiedTimeLucene: 20220327210830753
+onlyTopLines: 
+SATISFIABLE
+ State 0:
+ State 1:
+  move(f,-1)
+ State 2:
+  move(i,-3)
+ State 3:
+onlyBottomLines: 
+ State 9:
+  move(f,4)
+------------------------------
+Documento 39
+path: /home/jorge/apuntes/current/rcra/practicas/unblock/my_solutions/sol4.txt
+contentsStored: 
+SATISFIABLE
+ State 0:
+ State 1:
+  move(i,-1)
+ State 2:
+  move(e,1)
+ State 3:
+  move(a,1)
+ State 4:
+  move(b,-3)
+ State 5:
+  move(c,-1)
+ State 6:
+  move(f,-2)
+ State 7:
+  move(d,2)
+ State 8:
+  move(e,3)
+hostname: HUAWEI
+thread: pool-1-thread-5
+type: regular
+sizeKb: 0.202
+creationTime: 2022-03-27T21:08:30.123477Z
+lastAccessTime: 2022-03-27T21:10:14.043399Z
+lastModifiedTime: 2022-03-27T21:08:30.123477Z
+creationTimeLucene: 20220327210830123
+lastAccessTimeLucene: 20220327211014043
+lastModifiedTimeLucene: 20220327210830123
+onlyTopLines: 
+SATISFIABLE
+ State 0:
+ State 1:
+  move(i,-1)
+ State 2:
+  move(e,1)
+ State 3:
+onlyBottomLines: 
+ State 8:
+  move(e,3)
+------------------------------
+Documento 40
+path: /home/jorge/apuntes/current/rcra/practicas/unblock/my_solutions/sol9.txt
+contentsStored: 
+SATISFIABLE
+ State 0:
+ State 1:
+  move(l,3)
+ State 2:
+  move(j,1)
+ State 3:
+  move(i,2)
+ State 4:
+  move(b,3)
+ State 5:
+  move(a,3)
+ State 6:
+  move(h,-2)
+ State 7:
+  move(c,-2)
+ State 8:
+  move(e,-2)
+ State 9:
+  move(d,-2)
+ State 10:
+  move(f,-1)
+ State 11:
+  move(i,2)
+ State 12:
+  move(j,-3)
+ State 13:
+  move(k,-1)
+ State 14:
+  move(i,-2)
+ State 15:
+  move(f,2)
+ State 16:
+  move(d,1)
+ State 17:
+  move(j,-1)
+ State 18:
+  move(h,2)
+ State 19:
+  move(g,-1)
+ State 20:
+  move(b,-1)
+ State 21:
+  move(l,-3)
+ State 22:
+  move(f,1)
+ State 23:
+  move(h,2)
+hostname: HUAWEI
+thread: pool-1-thread-5
+type: regular
+sizeKb: 0.554
+creationTime: 2022-03-27T21:08:32.786807Z
+lastAccessTime: 2022-03-27T21:16:28.263808Z
+lastModifiedTime: 2022-03-27T21:08:32.786807Z
+creationTimeLucene: 20220327210832786
+lastAccessTimeLucene: 20220327211628263
+lastModifiedTimeLucene: 20220327210832786
+onlyTopLines: 
+SATISFIABLE
+ State 0:
+ State 1:
+  move(l,3)
+ State 2:
+  move(j,1)
+ State 3:
+onlyBottomLines: 
+ State 23:
+  move(h,2)
+------------------------------
+Documento 41
+path: /home/jorge/apuntes/current/rcra/practicas/unblock/examples/sol6.txt
+contentsStored: 
+SATISFIABLE
+ State 0:
+ State 1:
+  move(g,2)
+ State 2:
+  move(e,1)
+ State 3:
+  move(a,3)
+ State 4:
+  move(d,2)
+ State 5:
+  move(f,-3)
+ State 6:
+  move(d,-2)
+ State 7:
+  move(e,-1)
+ State 8:
+  move(a,-3)
+ State 9:
+  move(g,-4)
+ State 10:
+  move(e,2)
+ State 11:
+  move(c,3)
+ State 12:
+  move(a,3)
+ State 13:
+  move(d,4)
+hostname: HUAWEI
+thread: pool-1-thread-5
+type: regular
+sizeKb: 0.317
+creationTime: 2022-03-03T10:23:29Z
+lastAccessTime: 2022-03-27T20:20:34.703022Z
+lastModifiedTime: 2022-03-03T10:23:29Z
+creationTimeLucene: 20220303102329000
+lastAccessTimeLucene: 20220327202034703
+lastModifiedTimeLucene: 20220303102329000
+onlyTopLines: 
+SATISFIABLE
+ State 0:
+ State 1:
+  move(g,2)
+ State 2:
+  move(e,1)
+ State 3:
+onlyBottomLines: 
+ State 13:
+  move(d,4)
+------------------------------
+Documento 42
+path: /home/jorge/apuntes/current/rcra/practicas/unblock/examples/level2.txt
+contentsStored: 
+aa...b
+c..e.b
+cdde.b
+c..e..
+f...gg
+f.hhh.
+d=4
+
+hostname: HUAWEI
+thread: pool-1-thread-5
+type: regular
+sizeKb: 0.047
+creationTime: 2016-02-24T08:18:25Z
+lastAccessTime: 2022-03-27T20:20:34.699689Z
+lastModifiedTime: 2016-02-24T08:18:25Z
+creationTimeLucene: 20160224081825000
+lastAccessTimeLucene: 20220327202034699
+lastModifiedTimeLucene: 20160224081825000
+onlyTopLines: 
+aa...b
+c..e.b
+cdde.b
+c..e..
+f...gg
+f.hhh.
+d=4
+onlyBottomLines: 
+f.hhh.
+d=4
+------------------------------
+Documento 43
+path: /home/jorge/apuntes/current/rcra/practicas/unblock/examples/sol3.txt
+contentsStored: 
+SATISFIABLE
+ State 0:
+ State 1:
+  move(h,1)
+ State 2:
+  move(g,2)
+ State 3:
+  move(f,3)
+ State 4:
+  move(c,2)
+ State 5:
+  move(e,-1)
+ State 6:
+  move(d,-1)
+ State 7:
+  move(i,-2)
+ State 8:
+  move(f,1)
+hostname: HUAWEI
+thread: pool-1-thread-5
+type: regular
+sizeKb: 0.201
+creationTime: 2022-03-03T10:23:29Z
+lastAccessTime: 2022-03-27T20:20:34.703022Z
+lastModifiedTime: 2022-03-03T10:23:29Z
+creationTimeLucene: 20220303102329000
+lastAccessTimeLucene: 20220327202034703
+lastModifiedTimeLucene: 20220303102329000
+onlyTopLines: 
+SATISFIABLE
+ State 0:
+ State 1:
+  move(h,1)
+ State 2:
+  move(g,2)
+ State 3:
+onlyBottomLines: 
+ State 8:
+  move(f,1)
+------------------------------
+Documento 44
+path: /home/jorge/apuntes/current/rcra/practicas/unblock/examples/level3.txt
+contentsStored: 
+abcddd
+abceee
+ffgh.i
+j.gh.i
+j..h.k
+ll...k
+f=4
+
+hostname: HUAWEI
+thread: pool-1-thread-5
+type: regular
+sizeKb: 0.047
+creationTime: 2016-02-24T08:18:25Z
+lastAccessTime: 2022-03-27T20:20:34.699689Z
+lastModifiedTime: 2016-02-24T08:18:25Z
+creationTimeLucene: 20160224081825000
+lastAccessTimeLucene: 20220327202034699
+lastModifiedTimeLucene: 20160224081825000
+onlyTopLines: 
+abcddd
+abceee
+ffgh.i
+j.gh.i
+j..h.k
+ll...k
+f=4
+onlyBottomLines: 
+ll...k
+f=4
+------------------------------
+Documento 45
+path: /home/jorge/apuntes/current/rcra/practicas/unblock/examples/sol8.txt
+contentsStored: 
+SATISFIABLE
+ State 0:
+ State 1:
+  move(l,-1)
+ State 2:
+  move(j,-1)
+ State 3:
+  move(f,2)
+ State 4:
+  move(b,2)
+ State 5:
+  move(c,3)
+ State 6:
+  move(a,4)
+ State 7:
+  move(e,-2)
+ State 8:
+  move(d,1)
+ State 9:
+  move(g,1)
+ State 10:
+  move(i,-4)
+ State 11:
+  move(l,-1)
+ State 12:
+  move(g,-1)
+ State 13:
+  move(j,-1)
+ State 14:
+  move(d,-1)
+ State 15:
+  move(e,4)
+ State 16:
+  move(g,1)
+ State 17:
+  move(d,1)
+ State 18:
+  move(i,2)
+ State 19:
+  move(c,-3)
+ State 20:
+  move(b,-2)
+ State 21:
+  move(d,3)
+hostname: HUAWEI
+thread: pool-1-thread-5
+type: regular
+sizeKb: 0.506
+creationTime: 2022-03-03T10:23:29Z
+lastAccessTime: 2022-03-27T20:20:34.703022Z
+lastModifiedTime: 2022-03-03T10:23:29Z
+creationTimeLucene: 20220303102329000
+lastAccessTimeLucene: 20220327202034703
+lastModifiedTimeLucene: 20220303102329000
+onlyTopLines: 
+SATISFIABLE
+ State 0:
+ State 1:
+  move(l,-1)
+ State 2:
+  move(j,-1)
+ State 3:
+onlyBottomLines: 
+ State 21:
+  move(d,3)
+------------------------------
+Documento 46
+path: /home/jorge/apuntes/current/rcra/practicas/unblock/examples/sol5.txt
+contentsStored: 
+SATISFIABLE
+ State 0:
+ State 1:
+  move(g,1)
+ State 2:
+  move(a,-1)
+ State 3:
+  move(d,2)
+ State 4:
+  move(b,3)
+ State 5:
+  move(c,2)
+ State 6:
+  move(f,-2)
+ State 7:
+  move(e,4)
+hostname: HUAWEI
+thread: pool-1-thread-5
+type: regular
+sizeKb: 0.178
+creationTime: 2022-03-03T10:23:29Z
+lastAccessTime: 2022-03-27T20:20:34.703022Z
+lastModifiedTime: 2022-03-03T10:23:29Z
+creationTimeLucene: 20220303102329000
+lastAccessTimeLucene: 20220327202034703
+lastModifiedTimeLucene: 20220303102329000
+onlyTopLines: 
+SATISFIABLE
+ State 0:
+ State 1:
+  move(g,1)
+ State 2:
+  move(a,-1)
+ State 3:
+onlyBottomLines: 
+ State 7:
+  move(e,4)
+------------------------------
+Documento 47
+path: /home/jorge/apuntes/current/rcra/practicas/unblock/examples/sol1.txt
+contentsStored: 
+SATISFIABLE
+ State 0:
+ State 1:
+  move(b,1)
+ State 2:
+  move(c,-4)
+ State 3:
+  move(e,1)
+ State 4:
+  move(d,-2)
+ State 5:
+  move(a,3)
+ State 6:
+  move(b,3)
+hostname: HUAWEI
+thread: pool-1-thread-5
+type: regular
+sizeKb: 0.156
+creationTime: 2022-03-03T10:23:29Z
+lastAccessTime: 2022-03-27T20:20:34.699689Z
+lastModifiedTime: 2022-03-03T10:23:29Z
+creationTimeLucene: 20220303102329000
+lastAccessTimeLucene: 20220327202034699
+lastModifiedTimeLucene: 20220303102329000
+onlyTopLines: 
+SATISFIABLE
+ State 0:
+ State 1:
+  move(b,1)
+ State 2:
+  move(c,-4)
+ State 3:
+onlyBottomLines: 
+ State 6:
+  move(b,3)
+------------------------------
+Documento 48
+path: /home/jorge/apuntes/current/rcra/practicas/unblock/examples/level9.txt
+contentsStored: 
+abccdd
+abeefg
+.bhhfg
+iij.f.
+..jkk.
+lll...
+h=4
+hostname: HUAWEI
+thread: pool-1-thread-5
+type: regular
+sizeKb: 0.046
+creationTime: 2022-03-02T21:40:46Z
+lastAccessTime: 2022-03-27T20:53:59.489336Z
+lastModifiedTime: 2022-03-02T21:40:46Z
+creationTimeLucene: 20220302214046000
+lastAccessTimeLucene: 20220327205359489
+lastModifiedTimeLucene: 20220302214046000
+onlyTopLines: 
+abccdd
+abeefg
+.bhhfg
+iij.f.
+..jkk.
+lll...
+h=4
+onlyBottomLines: 
+lll...
+h=4
+------------------------------
+Documento 49
+path: /home/jorge/apuntes/current/rcra/practicas/unblock/examples/level10.txt
+contentsStored: 
+abbc..
+adecff
+adeggh
+..i..h
+jji..k
+lll..k
+g=4
+hostname: HUAWEI
+thread: pool-1-thread-5
+type: regular
+sizeKb: 0.046
+creationTime: 2022-03-03T12:49:21Z
+lastAccessTime: 2022-03-27T20:54:03.685891Z
+lastModifiedTime: 2022-03-03T12:49:21Z
+creationTimeLucene: 20220303124921000
+lastAccessTimeLucene: 20220327205403685
+lastModifiedTimeLucene: 20220303124921000
+onlyTopLines: 
+abbc..
+adecff
+adeggh
+..i..h
+jji..k
+lll..k
+g=4
+onlyBottomLines: 
+lll..k
+g=4
+------------------------------
+Documento 50
+path: /home/jorge/apuntes/current/rcra/practicas/unblock/examples/sol10.txt
+contentsStored: 
+SATISFIABLE
+ State 0:
+ State 1:
+  move(a,1)
+ State 2:
+  move(b,-1)
+ State 3:
+  move(e,-1)
+ State 4:
+  move(i,-1)
+ State 5:
+  move(j,3)
+ State 6:
+  move(i,1)
+ State 7:
+  move(d,2)
+ State 8:
+  move(g,-2)
+ State 9:
+  move(c,2)
+ State 10:
+  move(f,-1)
+ State 11:
+  move(h,-2)
+ State 12:
+  move(k,-1)
+ State 13:
+  move(l,3)
+ State 14:
+  move(i,1)
+ State 15:
+  move(a,2)
+ State 16:
+  move(g,-1)
+ State 17:
+  move(e,2)
+ State 18:
+  move(f,-3)
+ State 19:
+  move(e,-2)
+ State 20:
+  move(c,-2)
+ State 21:
+  move(g,4)
+hostname: HUAWEI
+thread: pool-1-thread-5
+type: regular
+sizeKb: 0.507
+creationTime: 2022-03-03T10:23:29Z
+lastAccessTime: 2022-03-27T20:20:34.699689Z
+lastModifiedTime: 2022-03-03T10:23:29Z
+creationTimeLucene: 20220303102329000
+lastAccessTimeLucene: 20220327202034699
+lastModifiedTimeLucene: 20220303102329000
+onlyTopLines: 
+SATISFIABLE
+ State 0:
+ State 1:
+  move(a,1)
+ State 2:
+  move(b,-1)
+ State 3:
+onlyBottomLines: 
+ State 21:
+  move(g,4)
+------------------------------
+Documento 51
+path: /home/jorge/apuntes/current/rcra/practicas/unblock/examples/level7.txt
+contentsStored: 
+aa.b..
+cc.bde
+.ffgde
+hhigde
+j.ig..
+j..kkk
+f=4
+hostname: HUAWEI
+thread: pool-1-thread-5
+type: regular
+sizeKb: 0.046
+creationTime: 2016-02-24T08:18:25Z
+lastAccessTime: 2022-03-27T20:20:34.699689Z
+lastModifiedTime: 2016-02-24T08:18:25Z
+creationTimeLucene: 20160224081825000
+lastAccessTimeLucene: 20220327202034699
+lastModifiedTimeLucene: 20160224081825000
+onlyTopLines: 
+aa.b..
+cc.bde
+.ffgde
+hhigde
+j.ig..
+j..kkk
+f=4
+onlyBottomLines: 
+j..kkk
+f=4
+------------------------------
+Documento 52
+path: /home/jorge/apuntes/current/rcra/practicas/unblock/examples/sol2.txt
+contentsStored: 
+SATISFIABLE
+ State 0:
+ State 1:
+  move(a,1)
+ State 2:
+  move(c,-1)
+ State 3:
+  move(f,-1)
+ State 4:
+  move(g,-3)
+ State 5:
+  move(h,-2)
+ State 6:
+  move(e,2)
+ State 7:
+  move(b,3)
+ State 8:
+  move(d,3)
+hostname: HUAWEI
+thread: pool-1-thread-5
+type: regular
+sizeKb: 0.202
+creationTime: 2022-03-03T10:23:29Z
+lastAccessTime: 2022-03-27T20:20:34.703022Z
+lastModifiedTime: 2022-03-03T10:23:29Z
+creationTimeLucene: 20220303102329000
+lastAccessTimeLucene: 20220327202034703
+lastModifiedTimeLucene: 20220303102329000
+onlyTopLines: 
+SATISFIABLE
+ State 0:
+ State 1:
+  move(a,1)
+ State 2:
+  move(c,-1)
+ State 3:
+onlyBottomLines: 
+ State 8:
+  move(d,3)
+------------------------------
+Documento 53
+path: /home/jorge/apuntes/current/rcra/practicas/unblock/examples/level6.txt
+contentsStored: 
+..ab.c
+..ab.c
+ddae.c
+.f.e..
+.fgg..
+......
+d=4
+hostname: HUAWEI
+thread: pool-1-thread-5
+type: regular
+sizeKb: 0.046
+creationTime: 2016-02-24T08:18:25Z
+lastAccessTime: 2022-03-27T20:20:34.699689Z
+lastModifiedTime: 2016-02-24T08:18:25Z
+creationTimeLucene: 20160224081825000
+lastAccessTimeLucene: 20220327202034699
+lastModifiedTimeLucene: 20160224081825000
+onlyTopLines: 
+..ab.c
+..ab.c
+ddae.c
+.f.e..
+.fgg..
+......
+d=4
+onlyBottomLines: 
+......
+d=4
+------------------------------
+Documento 54
+path: /home/jorge/apuntes/current/rcra/practicas/unblock/examples/sol7.txt
+contentsStored: 
+SATISFIABLE
+ State 0:
+ State 1:
+  move(f,-1)
+ State 2:
+  move(i,-3)
+ State 3:
+  move(h,1)
+ State 4:
+  move(j,-1)
+ State 5:
+  move(k,-3)
+ State 6:
+  move(e,2)
+ State 7:
+  move(g,1)
+ State 8:
+  move(d,2)
+ State 9:
+  move(f,4)
+hostname: HUAWEI
+thread: pool-1-thread-5
+type: regular
+sizeKb: 0.224
+creationTime: 2022-03-03T10:23:29Z
+lastAccessTime: 2022-03-27T20:20:34.703022Z
+lastModifiedTime: 2022-03-03T10:23:29Z
+creationTimeLucene: 20220303102329000
+lastAccessTimeLucene: 20220327202034703
+lastModifiedTimeLucene: 20220303102329000
+onlyTopLines: 
+SATISFIABLE
+ State 0:
+ State 1:
+  move(f,-1)
+ State 2:
+  move(i,-3)
+ State 3:
+onlyBottomLines: 
+ State 9:
+  move(f,4)
+------------------------------
+Documento 55
+path: /home/jorge/apuntes/current/rcra/practicas/unblock/examples/level4.txt
+contentsStored: 
+a..bbb
+a..c.d
+ee.cfd
+ggg.fd
+..h.ii
+jjhkk.
+e=4
+hostname: HUAWEI
+thread: pool-1-thread-5
+type: regular
+sizeKb: 0.046
+creationTime: 2016-02-24T08:18:25Z
+lastAccessTime: 2022-03-27T20:20:34.699689Z
+lastModifiedTime: 2016-02-24T08:18:25Z
+creationTimeLucene: 20160224081825000
+lastAccessTimeLucene: 20220327202034699
+lastModifiedTimeLucene: 20160224081825000
+onlyTopLines: 
+a..bbb
+a..c.d
+ee.cfd
+ggg.fd
+..h.ii
+jjhkk.
+e=4
+onlyBottomLines: 
+jjhkk.
+e=4
+------------------------------
+Documento 56
+path: /home/jorge/apuntes/current/rcra/practicas/unblock/examples/level5.txt
+contentsStored: 
+.aa.b.
+.cccbd
+eefg.d
+.hfg..
+.hi...
+jji...
+e=4
+hostname: HUAWEI
+thread: pool-1-thread-5
+type: regular
+sizeKb: 0.046
+creationTime: 2016-02-24T08:18:25Z
+lastAccessTime: 2022-03-27T20:20:34.699689Z
+lastModifiedTime: 2016-02-24T08:18:25Z
+creationTimeLucene: 20160224081825000
+lastAccessTimeLucene: 20220327202034699
+lastModifiedTimeLucene: 20160224081825000
+onlyTopLines: 
+.aa.b.
+.cccbd
+eefg.d
+.hfg..
+.hi...
+jji...
+e=4
+onlyBottomLines: 
+jji...
+e=4
+------------------------------
+Documento 57
+path: /home/jorge/apuntes/current/rcra/practicas/unblock/examples/level1.txt
+contentsStored: 
+...a..
+...a..
+bb.a..
+......
+c.ddd.
+c..ee.
+b=4
+hostname: HUAWEI
+thread: pool-1-thread-5
+type: regular
+sizeKb: 0.046
+creationTime: 2016-02-24T08:18:25Z
+lastAccessTime: 2022-03-27T20:20:14.783443Z
+lastModifiedTime: 2016-02-24T08:18:25Z
+creationTimeLucene: 20160224081825000
+lastAccessTimeLucene: 20220327202014783
+lastModifiedTimeLucene: 20160224081825000
+onlyTopLines: 
+...a..
+...a..
+bb.a..
+......
+c.ddd.
+c..ee.
+b=4
+onlyBottomLines: 
+c..ee.
+b=4
+------------------------------
+Documento 58
+path: /home/jorge/apuntes/current/rcra/practicas/unblock/examples/level8.txt
+contentsStored: 
+aa.b..
+cccb..
+ddef..
+ggefhh
+i.jjk.
+i.llk.
+d=4
+hostname: HUAWEI
+thread: pool-1-thread-5
+type: regular
+sizeKb: 0.046
+creationTime: 2022-03-02T21:39:43Z
+lastAccessTime: 2022-03-27T20:53:54.742797Z
+lastModifiedTime: 2022-03-02T21:39:43Z
+creationTimeLucene: 20220302213943000
+lastAccessTimeLucene: 20220327205354742
+lastModifiedTimeLucene: 20220302213943000
+onlyTopLines: 
+aa.b..
+cccb..
+ddef..
+ggefhh
+i.jjk.
+i.llk.
+d=4
+onlyBottomLines: 
+i.llk.
+d=4
+------------------------------
+Documento 59
+path: /home/jorge/apuntes/current/rcra/practicas/unblock/examples/sol4.txt
+contentsStored: 
+SATISFIABLE
+ State 0:
+ State 1:
+  move(e,1)
+ State 2:
+  move(a,1)
+ State 3:
+  move(b,-3)
+ State 4:
+  move(i,-1)
+ State 5:
+  move(c,-1)
+ State 6:
+  move(f,-2)
+ State 7:
+  move(d,2)
+ State 8:
+  move(e,3)
+hostname: HUAWEI
+thread: pool-1-thread-5
+type: regular
+sizeKb: 0.202
+creationTime: 2022-03-03T10:23:29Z
+lastAccessTime: 2022-03-27T20:20:34.703022Z
+lastModifiedTime: 2022-03-03T10:23:29Z
+creationTimeLucene: 20220303102329000
+lastAccessTimeLucene: 20220327202034703
+lastModifiedTimeLucene: 20220303102329000
+onlyTopLines: 
+SATISFIABLE
+ State 0:
+ State 1:
+  move(e,1)
+ State 2:
+  move(a,1)
+ State 3:
+onlyBottomLines: 
+ State 8:
+  move(e,3)
+------------------------------
+Documento 60
+path: /home/jorge/apuntes/current/rcra/practicas/unblock/examples/sol9.txt
+contentsStored: 
+SATISFIABLE
+ State 0:
+ State 1:
+  move(l,3)
+ State 2:
+  move(j,1)
+ State 3:
+  move(i,2)
+ State 4:
+  move(a,4)
+ State 5:
+  move(b,3)
+ State 6:
+  move(c,-2)
+ State 7:
+  move(d,-2)
+ State 8:
+  move(f,-1)
+ State 9:
+  move(i,1)
+ State 10:
+  move(h,-2)
+ State 11:
+  move(e,-2)
+ State 12:
+  move(j,-3)
+ State 13:
+  move(i,-1)
+ State 14:
+  move(k,-1)
+ State 15:
+  move(f,2)
+ State 16:
+  move(d,1)
+ State 17:
+  move(j,-1)
+ State 18:
+  move(h,2)
+ State 19:
+  move(g,-1)
+ State 20:
+  move(b,-1)
+ State 21:
+  move(l,-2)
+ State 22:
+  move(f,1)
+ State 23:
+  move(h,2)
+hostname: HUAWEI
+thread: pool-1-thread-5
+type: regular
+sizeKb: 0.554
+creationTime: 2022-03-03T10:23:29Z
+lastAccessTime: 2022-03-27T20:20:34.703022Z
+lastModifiedTime: 2022-03-03T10:23:29Z
+creationTimeLucene: 20220303102329000
+lastAccessTimeLucene: 20220327202034703
+lastModifiedTimeLucene: 20220303102329000
+onlyTopLines: 
+SATISFIABLE
+ State 0:
+ State 1:
+  move(l,3)
+ State 2:
+  move(j,1)
+ State 3:
+onlyBottomLines: 
+ State 23:
+  move(h,2)
 ------------------------------
