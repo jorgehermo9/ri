@@ -1,21 +1,21 @@
 Documento 0
-path: /home/jorge/github/ri/docs/root.txt
+path: /home/jorge/github/ri/docs/my_docs/root.txt
 contentsStored: 
 hostname: HUAWEI
 thread: pool-1-thread-4
 type: regular
 sizeKb: 0.0
 creationTime: 2022-03-16T12:08:47.516167Z
-lastAccessTime: 2022-03-28T16:29:48.488735Z
+lastAccessTime: 2022-03-29T16:11:33.56797Z
 lastModifiedTime: 2022-03-16T12:08:47.516167Z
 creationTimeLucene: 20220316120847516
-lastAccessTimeLucene: 20220328162948488
+lastAccessTimeLucene: 20220329161133567
 lastModifiedTimeLucene: 20220316120847516
 onlyTopLines: 
 onlyBottomLines: 
 ------------------------------
 Documento 1
-path: /home/jorge/github/ri/docs/3/archivo3.txt
+path: /home/jorge/github/ri/docs/my_docs/3/archivo3.txt
 contentsStored: 
 hostname: HUAWEI
 thread: pool-1-thread-1
@@ -31,7 +31,7 @@ onlyTopLines:
 onlyBottomLines: 
 ------------------------------
 Documento 2
-path: /home/jorge/github/ri/docs/2/archivo25.txt
+path: /home/jorge/github/ri/docs/my_docs/2/archivo25.txt
 contentsStored: linea8
 hostname: HUAWEI
 thread: pool-1-thread-2
@@ -47,7 +47,7 @@ onlyTopLines: linea8
 onlyBottomLines: linea8
 ------------------------------
 Documento 3
-path: /home/jorge/github/ri/docs/2/archivo26.txt
+path: /home/jorge/github/ri/docs/my_docs/2/archivo26.txt
 contentsStored: linea8
 hostname: HUAWEI
 thread: pool-1-thread-2
@@ -63,7 +63,7 @@ onlyTopLines: linea8
 onlyBottomLines: linea8
 ------------------------------
 Documento 4
-path: /home/jorge/github/ri/docs/2/archivo21.txt
+path: /home/jorge/github/ri/docs/my_docs/2/archivo21.txt
 contentsStored: linea8
 hostname: HUAWEI
 thread: pool-1-thread-2
@@ -79,7 +79,7 @@ onlyTopLines: linea8
 onlyBottomLines: linea8
 ------------------------------
 Documento 5
-path: /home/jorge/github/ri/docs/2/archivo2.txt
+path: /home/jorge/github/ri/docs/my_docs/2/archivo2.txt
 contentsStored: 
 linea1
 linea2
@@ -103,7 +103,7 @@ linea2
 linea8
 ------------------------------
 Documento 6
-path: /home/jorge/github/ri/docs/2/archivo23.txt
+path: /home/jorge/github/ri/docs/my_docs/2/archivo23.txt
 contentsStored: linea8
 hostname: HUAWEI
 thread: pool-1-thread-2
@@ -119,7 +119,7 @@ onlyTopLines: linea8
 onlyBottomLines: linea8
 ------------------------------
 Documento 7
-path: /home/jorge/github/ri/docs/2/archivo24.txt
+path: /home/jorge/github/ri/docs/my_docs/2/archivo24.txt
 contentsStored: linea8
 hostname: HUAWEI
 thread: pool-1-thread-2
@@ -135,7 +135,7 @@ onlyTopLines: linea8
 onlyBottomLines: linea8
 ------------------------------
 Documento 8
-path: /home/jorge/github/ri/docs/2/archivo22.txt
+path: /home/jorge/github/ri/docs/my_docs/2/archivo22.txt
 contentsStored: linea8
 hostname: HUAWEI
 thread: pool-1-thread-2
@@ -151,7 +151,7 @@ onlyTopLines: linea8
 onlyBottomLines: linea8
 ------------------------------
 Documento 9
-path: /home/jorge/github/ri/docs/1/archivo1.txt
+path: /home/jorge/github/ri/docs/my_docs/1/archivo1.txt
 contentsStored: 
 linea1
 linea1
@@ -187,7 +187,7 @@ linea7
 linea8
 ------------------------------
 Documento 10
-path: /home/jorge/github/ri/docs/1/archivo1-copia.txt
+path: /home/jorge/github/ri/docs/my_docs/1/archivo1-copia.txt
 contentsStored: 
 linea1
 linea1
@@ -223,7 +223,7 @@ linea7
 linea8
 ------------------------------
 Documento 11
-path: /home/jorge/github/ri/docs/1/11/archivo11.txt
+path: /home/jorge/github/ri/docs/my_docs/1/11/archivo11.txt
 contentsStored: linea1
 hostname: HUAWEI
 thread: pool-1-thread-3
@@ -239,7 +239,7 @@ onlyTopLines: linea1
 onlyBottomLines: linea1
 ------------------------------
 Documento 12
-path: /home/jorge/github/ri/docs/1/archivo1-casi-copia.txt
+path: /home/jorge/github/ri/docs/my_docs/1/archivo1-casi-copia.txt
 contentsStored: 
 linea1
 linea2
@@ -253,10 +253,10 @@ thread: pool-1-thread-3
 type: regular
 sizeKb: 0.049
 creationTime: 2022-03-28T22:14:34.037556Z
-lastAccessTime: 2022-03-28T22:14:26.100594Z
+lastAccessTime: 2022-03-28T22:14:51.164848Z
 lastModifiedTime: 2022-03-28T22:14:34.037556Z
 creationTimeLucene: 20220328221434037
-lastAccessTimeLucene: 20220328221426100
+lastAccessTimeLucene: 20220328221451164
 lastModifiedTimeLucene: 20220328221434037
 onlyTopLines: 
 linea1

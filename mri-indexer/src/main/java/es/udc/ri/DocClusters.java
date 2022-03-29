@@ -187,7 +187,22 @@ public class DocClusters{
 
 			KMeans kmeans = new KMeans();
 			KMeansResultado result = kmeans.calcular(puntos,k);
-			result.print();
+			List<Cluster> clusters = result.getClusters();
+
+			System.out.println("-------------------------------");
+			System.out.println(clusters.size()+ " Clusters");
+			System.out.println("docId => path");
+			System.out.println("-------------------------------");
+
+			int count = 0;
+			for (Cluster cluster : clusters) {
+				count++;
+				System.out.println("Cluster " + count+"\n");
+				for (Punto punto : cluster.getPuntos()) {
+					System.out.println(punto.getDocId()+" => "+punto.getPath());
+				}
+				System.out.println("-------------------------------");
+			}
 
 
 
