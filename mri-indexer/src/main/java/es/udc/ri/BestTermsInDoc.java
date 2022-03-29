@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import org.apache.lucene.document.Document;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.index.Terms;
@@ -187,6 +188,9 @@ public class BestTermsInDoc {
 			List<MyTerm> sortedTerms = order.sortTerms(terms);
 			List<MyTerm> topTerms = sortedTerms.subList(0, Math.min(top, sortedTerms.size()));
 
+			Document d = indexReader.document(docId);
+			String path = d.get("path");
+			out.println("Doc ID: "+docId+" => "+path);
 			out.println("\nBestTermsInDoc - " + field + " (top " + Math.min(top, sortedTerms.size()) + ")");
 
 			out.printf("%-77s\n", "-".repeat(77));
