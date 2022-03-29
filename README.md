@@ -33,3 +33,17 @@ mvn exec:java -Dexec.mainClass="es.udc.ri.SimilarDocs" -Dexec.args="-index /tmp/
 ```console
 mvn exec:java -Dexec.mainClass="es.udc.ri.DocClusters" -Dexec.args="-index /tmp/index -docID 9 -field contentsStored -top 10 -rep tf -k 4"
 ```
+
+Para separar entre idiomas en los clusters, funciona muy bien con el tf. En cambio, para ver la similitud entre dos noticias del mismo idioma, funciona muy bien el tfxidf.
+
+```console
+mvn exec:java -Dexec.mainClass="es.udc.ri.IndexFiles" -Dexec.args="-index /tmp/index -docs /home/jorge/github/ri/docs/news/ -openmode create -partialIndexes -numThreads 20"
+
+mvn exec:java -Dexec.mainClass="es.udc.ri.DocClusters" -Dexec.args="-index /tmp/index -docID 9 -field contentsStored -top 10 -rep tfxidf -k 2"
+```
+
+Por ejemplo, podemos ver que el más similar a russia.txt (frances) es ukraine.txt y ukraine2.txt ( en frances)
+
+```console
+mvn exec:java -Dexec.mainClass="es.udc.ri.DocClusters" -Dexec.args="-index /tmp/index -docID 0 -field contentsStored -top 10 -rep tfxidf -k 2"
+```
