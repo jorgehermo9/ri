@@ -101,11 +101,7 @@ public class DocClusters{
 			Directory dir = FSDirectory.open(Paths.get(indexPath));
 			DirectoryReader indexReader = DirectoryReader.open(dir);
 			
-			// Preguntar si evitar iterar sobre docs borrados
-			// Bits liveDocs = MultiFields.getLiveDocs(reader);
-			// for (int i=0; i<reader.maxDoc(); i++) {
-			// 	if (liveDocs != null && !liveDocs.get(i))
-			// 		continue;
+			
 
 			int numDocs = indexReader.numDocs();
 
@@ -114,6 +110,11 @@ public class DocClusters{
 				System.exit(1);
 			}
 			for ( int docId = 0; docId < numDocs; docId++ ) {
+				// Si quisiésemos no iterar sobre elementos borrados
+				// Bits liveDocs = MultiFields.getLiveDocs(reader);
+				// 	if (liveDocs != null && !liveDocs.get(docId))
+				// 		continue;
+
 				Terms termVector = indexReader.getTermVector(docId, field);
 				if ( termVector == null ) {
 					if ( docId == targetDocId ) {
@@ -175,6 +176,9 @@ public class DocClusters{
 
 			ArrayList<Punto> puntos = new ArrayList<Punto>();
 			
+			// Hacemos clustering sobre toda la colección, en vez de hacerlo sobre los más similares.
+			// Cambiarlo para hacerlo sobre los más similares sería sencillo, en vez de iterar sobre
+			// numdocs, pues se iteraría sobre cada elemento de topSimilarity y se cogería el docId.
 			for ( int docId = 0; docId < numDocs; docId++ ) {
 				if ( !allDocsTerms.containsKey(docId)){
 					// Si el campo en el docId no tenía term vector

@@ -47,3 +47,7 @@ Por ejemplo, podemos ver que el más similar a russia.txt (frances) es ukraine.t
 ```console
 mvn exec:java -Dexec.mainClass="es.udc.ri.DocClusters" -Dexec.args="-index /tmp/index -docID 0 -field contentsStored -top 10 -rep tfxidf -k 2"
 ```
+
+/tmp/news -> noticias
+/tmp/news_spanish_french
+/tmp/index -> my_docs

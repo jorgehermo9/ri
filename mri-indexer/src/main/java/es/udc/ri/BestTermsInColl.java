@@ -113,7 +113,7 @@ public class BestTermsInColl{
 
 			List<MyCollTerm> topTerms = sortedTerms.subList(0, Math.min(top, sortedTerms.size()));
 	
-			System.out.println("\nBestTermsInDoc - " + field + " (top " + Math.min(top, sortedTerms.size()) + ")");
+			System.out.println("\nBestTermsInColl - " + field + " (top " + Math.min(top, sortedTerms.size()) + ")");
 			System.out.printf("%-79s\n", "-".repeat(79));
 			System.out.printf("|%-50s | ", "Term");
 			System.out.printf("%-10s | ", dfOrder ? "df*" : "df");
