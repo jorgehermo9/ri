@@ -44,6 +44,7 @@ public class StatsField{
 			HashSet<String> fields = new HashSet<>();
 
 			if ( field == null ) {
+				//Otra manera para conseguir los fields que hay en la colección
 				// for(LeafReaderContext leaf : indexReader.leaves()){
 				// 	LeafReader leafReader = leaf.reader();
 				// 	FieldInfos fieldInfos = leafReader.getFieldInfos();

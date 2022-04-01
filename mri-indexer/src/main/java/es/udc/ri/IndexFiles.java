@@ -171,9 +171,6 @@ public class IndexFiles {
 
 						IndexWriter partialWriter = new IndexWriter(partialDir,partialIwc);
 						partialWriterList.add(partialWriter);
-						// Esto se hace así y no con una variable que guarde el writer que va a usar el worker,
-						// ya que sale un warning de recurso sin cerrar, debido a que metemos el writer en una
-						// lista y lo cerramos fuera del scope.
 
 						Runnable worker = new WorkerThread(path,partialWriter,update,depth,onlyFiles,onlyTopLines,onlyBottomLines);
 						executor.execute(worker);
@@ -182,7 +179,7 @@ public class IndexFiles {
 						executor.execute(worker);
 					}
 				}
-				// Always index root files 
+				// Indexamos también los archivos que cuelguen de la carpeta raíz, aunque se indique depth 0.
 				Runnable worker = new WorkerThread(docDir,mainWriter,update,1,onlyFiles,onlyTopLines,onlyBottomLines);
 				executor.execute(worker);
 

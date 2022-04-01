@@ -44,8 +44,6 @@ public class WriteIndex {
 			BufferedWriter bw = new BufferedWriter(fw);
 			PrintWriter out = new PrintWriter(bw)) {
 
-			//Preguntar si hace falta describir las exepciones que pueden pasar
-			//o simplemente un catch general
 			Directory dir = FSDirectory.open(Paths.get(indexPath));
 			DirectoryReader indexReader = DirectoryReader.open(dir);
 			

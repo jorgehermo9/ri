@@ -34,7 +34,7 @@ public class DocClusters{
 		//Default top 10
 		Integer top = 10;
 		Integer k=null;
-		//Default order TF
+		//Default rep TF
 		Representation rep = Representation.tf;
 
 		for ( int i = 0; i < args.length; i++ ) {
@@ -179,8 +179,22 @@ public class DocClusters{
 			// Hacemos clustering sobre toda la colección, en vez de hacerlo sobre los más similares.
 			// Cambiarlo para hacerlo sobre los más similares sería sencillo, en vez de iterar sobre
 			// numdocs, pues se iteraría sobre cada elemento de topSimilarity y se cogería el docId.
+			// Ejemplo de como se podría hacer así:
+			// for (DocSimilarity doc : topSimilarity) {
+			// 	Integer docId = doc.getDocId();
+			// 	if ( !allDocsVector.containsKey(docId)){
+			// 		// Si el campo en el docId no tenía term vector
+			// 		continue;
+			// 	}
+			// 	Document d = indexReader.document(docId);
+			// 	String path = d.get("path");
+			// 	puntos.add(new Punto(allDocsVector.get(docId),docId,path));
+			// }
+
+
+			//En este caso iteramos sobre toda la colección
 			for ( int docId = 0; docId < numDocs; docId++ ) {
-				if ( !allDocsTerms.containsKey(docId)){
+				if ( !allDocsVector.containsKey(docId)){
 					// Si el campo en el docId no tenía term vector
 					continue;
 				}

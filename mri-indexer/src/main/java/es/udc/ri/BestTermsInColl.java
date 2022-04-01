@@ -39,9 +39,9 @@ public class BestTermsInColl{
 
 	public static void main(String[] args) {
 	
-		String usage = "java es.udc.ri.BestTermsInDoc"
-		+ " [-index INDEX_PATH] [-docID ID] [-field FIELD] [-top N] \n"
-		+ "[-order {tf|df|idf|tfxidf}]\n\n";
+		String usage = "java es.udc.ri.BestTermsInColl"
+		+ " [-index INDEX_PATH] [-field FIELD] [-top N] \n"
+		+ "[-rev]\n\n";
 		
 		String indexPath = null;
 		String field = null;
