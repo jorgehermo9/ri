@@ -176,24 +176,11 @@ public class DocClusters{
 
 			ArrayList<Punto> puntos = new ArrayList<Punto>();
 			
-			// Hacemos clustering sobre toda la colección, en vez de hacerlo sobre los más similares.
-			// Cambiarlo para hacerlo sobre los más similares sería sencillo, en vez de iterar sobre
-			// numdocs, pues se iteraría sobre cada elemento de topSimilarity y se cogería el docId.
-			// Ejemplo de como se podría hacer así:
-			// for (DocSimilarity doc : topSimilarity) {
-			// 	Integer docId = doc.getDocId();
-			// 	if ( !allDocsVector.containsKey(docId)){
-			// 		// Si el campo en el docId no tenía term vector
-			// 		continue;
-			// 	}
-			// 	Document d = indexReader.document(docId);
-			// 	String path = d.get("path");
-			// 	puntos.add(new Punto(allDocsVector.get(docId),docId,path));
-			// }
-
-
-			//En este caso iteramos sobre toda la colección
-			for ( int docId = 0; docId < numDocs; docId++ ) {
+			// Se podría hacer clustering sobre toda la colección, en vez de hacerlo sobre los más similares.
+			// Cambiarlo para hacerlo sobre la colección sería sencillo, en vez de iterar sobre
+			// topSimilarity, pues se iteraría sobre cada elemento del índice y se cogería el docId.
+			for (DocSimilarity doc : topSimilarity) {
+				Integer docId = doc.getDocId();
 				if ( !allDocsVector.containsKey(docId)){
 					// Si el campo en el docId no tenía term vector
 					continue;
@@ -202,6 +189,19 @@ public class DocClusters{
 				String path = d.get("path");
 				puntos.add(new Punto(allDocsVector.get(docId),docId,path));
 			}
+
+
+			// //En este caso iteramos sobre toda la colección
+			//Ejemplo:
+			// for ( int docId = 0; docId < numDocs; docId++ ) {
+			// 	if ( !allDocsVector.containsKey(docId)){
+			// 		// Si el campo en el docId no tenía term vector
+			// 		continue;
+			// 	}
+			// 	Document d = indexReader.document(docId);
+			// 	String path = d.get("path");
+			// 	puntos.add(new Punto(allDocsVector.get(docId),docId,path));
+			// }
 
 			KMeans kmeans = new KMeans();
 			KMeansResultado result = kmeans.calcular(puntos,k);
