@@ -102,7 +102,7 @@ public class IndexMedline{
 						try{
 							lambda = Float.parseFloat(args[++i]);
 						}catch (Exception e){
-							throw new IllegalArgumentException("Error while parsing lambda. "+e.getMessage());
+							throw new IllegalArgumentException("Error while parsing lambda: "+e.getMessage());
 						}
 						similarity = new LMJelinekMercerSimilarity(lambda);
 					} else if (indexingmodel.equals("tfidf")){
