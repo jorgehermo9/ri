@@ -24,7 +24,7 @@ class MedlineDoc{
 	String getContents(){return contents;}
 
 	public String toString(){
-		return "Doc Id: " + docIdMedline + "\n Contents:\n"+contents;
+		return "Doc Id: " + docIdMedline + "\nContents:\n"+contents;
 	}
 }
 
