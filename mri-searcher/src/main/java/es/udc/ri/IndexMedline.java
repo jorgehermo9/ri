@@ -3,66 +3,106 @@ package es.udc.ri;
 import java.io.BufferedReader;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
+import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 
+import org.apache.lucene.analysis.standard.StandardAnalyzer;
+import org.apache.lucene.document.Document;
+import org.apache.lucene.document.Field;
+import org.apache.lucene.document.StringField;
+import org.apache.lucene.document.TextField;
+import org.apache.lucene.index.IndexWriter;
+import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.index.IndexWriterConfig.OpenMode;
 import org.apache.lucene.search.similarities.LMJelinekMercerSimilarity;
 import org.apache.lucene.search.similarities.Similarity;
+import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.search.similarities.ClassicSimilarity;
 
 
-class MedlineDoc{
-	private long docIdMedline;
+class MedlineInfo{
+	private long id;
 	private String contents;
-	MedlineDoc(long docIdMedline, String contents){
-		this.docIdMedline = docIdMedline;
+	MedlineInfo(long id, String contents){
+		this.id = id;
 		this.contents = contents;
 	}
 	
-	long getDocIdMedline(){return docIdMedline;}
+	long getId(){return id;}
 	String getContents(){return contents;}
 
-	public String toString(){
-		return "Doc Id: " + docIdMedline + "\nContents:\n"+contents;
-	}
-}
-
-public class IndexMedline{
-
-	public static List<MedlineDoc> parseMedline(FileReader collectionReader){
+	public static List<MedlineInfo> parseMedline(FileReader collectionReader){
 		BufferedReader bufferedReader = new BufferedReader(collectionReader);
 		String line;
-		Long medLineId=null;
-		String medLineContent="";
-		List<MedlineDoc> docs = new ArrayList<>();
+		Long medlineId=null;
+		String medlineContent="";
+		List<MedlineInfo> docs = new ArrayList<>();
 		try{
 			while ((line = bufferedReader.readLine()) != null){
 				if(line.startsWith(".I")){
-					if(medLineId != null){
+					if(medlineId != null){
 						// Hacemos trim para eliminar el último salto de línea
-						docs.add(new MedlineDoc(medLineId, medLineContent.trim()));
+						docs.add(new MedlineInfo(medlineId, medlineContent.trim()));
 					}
-					medLineId = Long.parseLong(line.split(" ")[1]);
+					medlineId = Long.parseLong(line.split(" ")[1]);
 				}else if(line.startsWith(".W")){
-					medLineContent="";
+					medlineContent="";
 				}else{
-					medLineContent+=line+"\n";
+					medlineContent+=line+"\n";
 				}
 			}
 
 			//Al acabar, guardar el último documento
-			if (medLineId !=null){
-				docs.add(new MedlineDoc(medLineId, medLineContent.trim()));
+			if (medlineId !=null){
+				docs.add(new MedlineInfo(medlineId, medlineContent.trim()));
 			}
 
 		}catch (Exception e){
 			System.err.println("Exception while parsing medline: " + e.getMessage());
 			e.printStackTrace();
+			System.exit(1);
 		}
 
 		return docs;
 	}
+
+	public static HashMap<Long,List<Long>> getRelevance(FileReader relevanceReader){
+		BufferedReader bufferedReader = new BufferedReader(relevanceReader);
+		HashMap<Long,List<Long>> relevances = new HashMap<>();
+		bufferedReader.lines().forEach((line) -> {
+			String[] splitted = line.split(" ");
+			if (splitted.length != 4){
+				System.err.println("Error while parsing line in query relevances: invalid line format");
+				return;
+			}
+			long query;
+			long doc;
+			try{
+				query = Long.parseLong(splitted[0]);
+				doc = Long.parseLong(splitted[2]);
+			}catch (NumberFormatException e){
+				System.err.println("Error parsing line in query relevances: "+e.getMessage());
+				return;
+			}
+			if (!relevances.containsKey(query)){
+				relevances.put(query,new ArrayList<Long>());
+			}
+			relevances.get(query).add(doc);
+		});
+		return relevances;
+	}
+
+
+	public String toString(){
+		return "Id: " + id + "\nContents:\n"+contents;
+	}
+}
+
+public class IndexMedline{
+
+	
 	public static void main(String[] args) {
 
 		String usage = "java es.udc.ri.IndexMedline"
@@ -108,7 +148,7 @@ public class IndexMedline{
 					} else if (indexingmodel.equals("tfidf")){
 						similarity = new ClassicSimilarity();
 					} else {
-						throw new IllegalArgumentException("Open mode not supported: " + indexingmodel);
+						throw new IllegalArgumentException("indexing model not supported: " + indexingmodel);
 					}
 					break;
 
@@ -122,15 +162,56 @@ public class IndexMedline{
 			System.err.println("Usage: " +usage);
 			System.exit(1);
 		}
-		try{
-			FileReader reader = new FileReader(docsPath+"/MED.ALL");
-			System.out.println(parseMedline(reader));
 
+		FileReader reader = null;
+		try{
+			reader = new FileReader(docsPath+"/MED.ALL");
 		}catch(FileNotFoundException e){
-			System.err.println("File not found: " + docsPath);
+			System.err.println("Medline file not found: " + docsPath);
+			System.exit(1);
+		}
+		List<MedlineInfo> medlineDocs = MedlineInfo.parseMedline(reader);
+
+		IndexWriterConfig iwc = new IndexWriterConfig(new StandardAnalyzer());
+		iwc.setSimilarity(similarity);
+		iwc.setOpenMode(openmode);
+
+		IndexWriter writer = null;
+
+		try{
+			writer = new IndexWriter(FSDirectory.open(Paths.get(indexPath)),iwc);
+		}catch(Exception e){
+			System.err.println("Could not create index writer: " + e.getMessage());
+			System.exit(1);
 		}
 
-				
+		
+
+		for (MedlineInfo medlineDoc : medlineDocs){
+			Document doc = new Document();
+			
+			doc.add(new StringField("DocIDMedline", Long.toString(medlineDoc.getId()), Field.Store.YES));
+			doc.add(new TextField("Contents", medlineDoc.getContents(), Field.Store.YES));
+
+			try {
+				writer.addDocument(doc);
+				System.out.println("Added document with DocIDMedline "+medlineDoc.getId());
+			} catch (Exception e){
+				System.err.println("Error while adding to index document with DocIDMedline "+medlineDoc.getId()
+				+": "+e.getMessage());
+			}
+		}
+
+		try{
+			writer.commit();
+			writer.close();
+		}catch (Exception e){
+			System.err.println("Error while closing index: "+e.getMessage());
+			System.exit(1);
+		}
+
+		System.out.println("Succesfully added all documents to index in "+indexPath);
+
 	}
 
 }
