@@ -29,8 +29,14 @@ class MedlineInfo {
 		this.id = id;
 		this.contents = contents;
 	}
-	long getId() { return this.id; }
-	String getContents() { return this.contents; }
+
+	long getId() {
+		return this.id;
+	}
+
+	String getContents() {
+		return this.contents;
+	}
 
 	public static List<MedlineInfo> parseMedline(FileReader fileReader) {
 		BufferedReader bufferedReader = new BufferedReader(fileReader);
@@ -47,12 +53,12 @@ class MedlineInfo {
 				} else if (line.startsWith(".W")) {
 					medlineContent = "";
 				} else {
-					medlineContent += line+"\n";
+					medlineContent += line + "\n";
 				}
 			}
 
 			// Al acabar, guardar el último documento
-			if (medlineId !=null) 
+			if (medlineId != null)
 				docs.add(new MedlineInfo(medlineId, medlineContent.trim()));
 
 		} catch (Exception e) {
@@ -63,10 +69,10 @@ class MedlineInfo {
 		return docs;
 	}
 
-	public static HashMap<Long,List<Long>> getRelevance(FileReader relevanceReader) {
+	public static HashMap<Long, List<Long>> getRelevance(FileReader relevanceReader) {
 		BufferedReader bufferedReader = new BufferedReader(relevanceReader);
-		HashMap<Long,List<Long>> relevances = new HashMap<>();
-		
+		HashMap<Long, List<Long>> relevances = new HashMap<>();
+
 		bufferedReader.lines().forEach((line) -> {
 			String[] splitted = line.split(" ");
 			if (splitted.length != 4) {
@@ -90,19 +96,19 @@ class MedlineInfo {
 	}
 
 	public String toString() {
-		return "Id: " + id + "\nContents:\n"+contents;
+		return "Id: " + id + "\nContents:\n" + contents;
 	}
 }
 
-public class IndexMedline{
+public class IndexMedline {
 	public static void main(String[] args) {
 
 		String usage = "java es.udc.ri.IndexMedline"
-			+ " [-index INDEX_PATH] [-docs DOCS_PATH \n"
-			+ "[-openmode {create|append|create_or_append}]\n"
-			+" [-indexingmodel {jm lambda | tfidf}]\n\n"
-			+ "This indexes the documents in DOCS_PATH, creating a Lucene index"
-			+ "in INDEX_PATH\n";
+				+ " [-index INDEX_PATH] [-docs DOCS_PATH \n"
+				+ "[-openmode {create|append|create_or_append}]\n"
+				+ " [-indexingmodel {jm lambda | tfidf}]\n\n"
+				+ "This indexes the documents in DOCS_PATH, creating a Lucene index"
+				+ "in INDEX_PATH\n";
 
 		String indexPath = null;
 		String docsPath = null;
@@ -135,7 +141,7 @@ public class IndexMedline{
 						try {
 							lambda = Float.parseFloat(args[++i]);
 						} catch (Exception e) {
-							throw new IllegalArgumentException("Error while parsing lambda: "+e.getMessage());
+							throw new IllegalArgumentException("Error while parsing lambda: " + e.getMessage());
 						}
 						similarity = new LMJelinekMercerSimilarity(lambda);
 					} else if (indexingmodel.equals("tfidf")) {
@@ -149,8 +155,8 @@ public class IndexMedline{
 					throw new IllegalArgumentException("unknown parameter " + args[i]);
 			}
 		}
-			
-		if (indexPath == null || docsPath ==null || similarity == null) {
+
+		if (indexPath == null || docsPath == null || similarity == null) {
 			System.err.println("Usage: " + usage);
 			System.exit(1);
 		}
@@ -174,7 +180,7 @@ public class IndexMedline{
 		} catch (Exception e) {
 			System.err.println("Could not create index writer: " + e.getMessage());
 			System.exit(1);
-		}		
+		}
 
 		for (MedlineInfo medlineDoc : medlineDocs) {
 			Document doc = new Document();
@@ -182,10 +188,10 @@ public class IndexMedline{
 			doc.add(new TextField("Contents", medlineDoc.getContents(), Field.Store.YES));
 			try {
 				writer.addDocument(doc);
-				System.out.println("Added document with DocIDMedline "+medlineDoc.getId());
+				System.out.println("Added document with DocIDMedline " + medlineDoc.getId());
 			} catch (Exception e) {
 				System.err.println("Error while adding to index document with DocIDMedline " + medlineDoc.getId()
-				+ ": " + e.getMessage());
+						+ ": " + e.getMessage());
 			}
 		}
 
