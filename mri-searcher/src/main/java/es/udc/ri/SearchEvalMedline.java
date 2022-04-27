@@ -1,7 +1,10 @@
 package es.udc.ri;
 
+import java.io.BufferedWriter;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.PrintWriter;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -51,6 +54,9 @@ public class SearchEvalMedline{
 		Integer lowerBound = null;
 		Integer upperBound = null;
 
+		String indexingmodel=null;
+		Float lambda=null;
+
 		Similarity similarity = null;
 		Integer cut = null;
 		Integer top = null;
@@ -64,9 +70,8 @@ public class SearchEvalMedline{
 					docsPath = args[++i];
 					break;
 				case "-search":
-					String indexingmodel = args[++i];
+					indexingmodel = args[++i];
 					if (indexingmodel.contains("jm")){
-						Float lambda;
 						try{
 							lambda = Float.parseFloat(args[++i]);
 						}catch (Exception e){
@@ -176,11 +181,46 @@ public class SearchEvalMedline{
 		searcher.setSimilarity(similarity);
 		parser = new QueryParser("Contents", new StandardAnalyzer());
 
-		List<QueryMetrics> metrics = new ArrayList<>();
 
+		String outputFile =null;
+		String csvFile =null;
+
+		if (indexingmodel.equals("tfidf")){
+			outputFile="medline.tfidf."+top+".hits.q"+queries+".txt";
+			csvFile="medline.tfidf."+cut+".cut.q"+queries+".csv";
+
+		}else if (indexingmodel.equals("jm")){
+			outputFile="medline.jm."+top+".hits.lambda."+
+				lambda+".q"+queries+".txt";
+
+			csvFile="medline.jm."+cut+".cut.lambda."+
+				lambda+".q"+queries+".csv";
+		}else{
+			System.err.println("Indexing model not supported: "+indexingmodel);
+		}
+
+		PrintWriter outputFileWriter = null;
+		PrintWriter csvFileWriter = null;
+
+		try{
+			FileWriter fw = new FileWriter(outputFile, false);
+			BufferedWriter bw = new BufferedWriter(fw);
+			outputFileWriter = new PrintWriter(bw);
+
+			FileWriter csvFw = new FileWriter(csvFile, false);
+			BufferedWriter csvBw = new BufferedWriter(csvFw);
+			csvFileWriter = new PrintWriter(csvBw);
+		}catch (Exception e){
+			System.err.println("Error while creating writer: "+e.getMessage());
+			System.exit(1);
+		}
+
+		PrintWriter[] outputs = new PrintWriter[]{outputFileWriter,new PrintWriter(System.out)};
+
+		List<QueryMetrics> metrics = new ArrayList<>();
 		for(MedlineInfo query : queriesInfo){
 			List<Long> relevantDocs = relevances.get(query.getId());
-			QueryMetrics queryMetrics = processQuery(reader,searcher,parser,query,relevantDocs,top,cut);
+			QueryMetrics queryMetrics = processQuery(outputs,reader,searcher,parser,query,relevantDocs,top,cut);
 			//Si se ha podido computar los query metrics
 			if (queryMetrics != null){
 				metrics.add(queryMetrics);
@@ -191,7 +231,7 @@ public class SearchEvalMedline{
 		double meanPrecision = metrics.stream().mapToDouble(metric -> metric.getPrecision()).summaryStatistics().getAverage();
 		double meanRecall = metrics.stream().mapToDouble(metric -> metric.getRecall()).summaryStatistics().getAverage();
 		double meanAp = metrics.stream().mapToDouble(metric -> metric.getAp()).summaryStatistics().getAverage();
-		System.out.println("----------------------------------------\n");
+		printlnTo("----------------------------------------\n",outputs);
 		String message;
 		if (queries.equals("all")){
 			message = "all queries";
@@ -200,15 +240,37 @@ public class SearchEvalMedline{
 		}else{
 			message = "query " + queries;
 		}
-		System.out.println("Summary for "+message+":");
-		System.out.println("Mean P@"+cut+": "+meanPrecision);
-		System.out.println("Mean Recall@"+cut+": "+meanRecall);
-		System.out.println("MAP@"+cut+": "+meanAp);
+		printlnTo("Summary for "+message+":",outputs);
+		printlnTo("Mean P@"+cut+": "+meanPrecision,outputs);
+		printlnTo("Mean Recall@"+cut+": "+meanRecall,outputs);
+		printlnTo("MAP@"+cut+": "+meanAp,outputs);
 
+
+		// Create csv
+
+		csvFileWriter.println("query,P@"+cut+",Recall@"+cut+",AP@"+cut);
+		for (QueryMetrics metric: metrics){
+			csvFileWriter.println(metric.getQuery().getId()+","+metric.getPrecision()+","+
+				metric.getRecall()+","+metric.getAp());
+		}
+		csvFileWriter.println("mean,"+meanPrecision+","+meanRecall+","+meanAp);
+
+
+		outputFileWriter.close();
+		csvFileWriter.close();
 
 	}
-
-	public static QueryMetrics processQuery(IndexReader reader, IndexSearcher searcher, QueryParser parser, MedlineInfo query,List<Long> relevantDocs,int top,int cut){
+	private static void printTo(String content,PrintWriter[] outputs){
+		for (PrintWriter output : outputs){
+			output.print(content);
+			output.flush();
+		}
+		
+	}
+	private static void printlnTo(String content,PrintWriter[] outputs){
+		printTo(content+"\n",outputs);
+	}
+	public static QueryMetrics processQuery(PrintWriter[] outputs,IndexReader reader, IndexSearcher searcher, QueryParser parser, MedlineInfo query,List<Long> relevantDocs,int top,int cut){
 
 		//Pasar a minúsculas y eliminar paréntesis
 		String queryContents = query.getContents().toLowerCase().replace("(", "").replace(")","");
@@ -234,16 +296,16 @@ public class SearchEvalMedline{
 		int VP = 0;
 		double apAux=0;
 
-		System.out.println("-------------------------");
-		System.out.println("Ranking for query "+query.getId()+": "+queryContents);
+		printlnTo("-------------------------",outputs);
+		printlnTo("Ranking for query "+query.getId()+": "+queryContents+"",outputs);
 
-		System.out.printf("%-37s\n", "-".repeat(37));
+		printTo(String.format("%-37s\n", "-".repeat(37)),outputs);
 
-		System.out.printf("|%-4s | ", "Rank");
-		System.out.printf("%-9s | ", "MedlineID");
-		System.out.printf("%-9s | ", "Score");
-		System.out.printf("%-4s|\n", "Rel");
-		System.out.printf("%-37s\n", "-".repeat(37));
+		printTo(String.format("|%-4s | ", "Rank"),outputs);
+		printTo(String.format("%-9s | ", "MedlineID"),outputs);
+		printTo(String.format("%-9s | ", "Score"),outputs);
+		printTo(String.format("%-4s|\n", "Rel"),outputs);
+		printTo(String.format("%-37s\n", "-".repeat(37)),outputs);
 		
 		for (int i = 0; i < Math.min(totalHits,numDocs); i++) {
 			int docId = scoreDocs[i].doc;
@@ -252,10 +314,10 @@ public class SearchEvalMedline{
 				boolean relevant = relevantDocs.contains(medlineId);
 				
 				if (i<top){
-					System.out.printf("|%-4d | ", i+1);
-					System.out.printf("%-9d | ", medlineId);
-					System.out.printf("%-9.6f | ", scoreDocs[i].score);
-					System.out.printf("%-4s|\n", relevant?" R":"");
+					printTo(String.format("|%-4d | ", i+1),outputs);
+					printTo(String.format("%-9d | ", medlineId),outputs);
+					printTo(String.format("%-9.6f | ", scoreDocs[i].score),outputs);
+					printTo(String.format("%-4s|\n", relevant?" R":""),outputs);
 				}
 
 				
@@ -268,7 +330,7 @@ public class SearchEvalMedline{
 				continue;
 			}
 		}
-		System.out.printf("%-37s\n", "-".repeat(37));
+		printTo(String.format("%-37s\n", "-".repeat(37)),outputs);
 
 		for(int i =0;i<Math.min(top,totalHits);i++){
 			ScoreDoc doc = scoreDocs[i];
@@ -276,8 +338,8 @@ public class SearchEvalMedline{
 			try{
 				long medlineId = Long.parseLong(reader.document(docId).get("DocIDMedline"));
 				String medlineContents = reader.document(docId).get("Contents");
-				System.out.println("Contents for document "+ medlineId+":");
-				System.out.println("\t"+medlineContents.replace("\n","\n\t"));
+				printlnTo("Contents for document "+ medlineId+":",outputs);
+				printlnTo("\t"+medlineContents.replace("\n","\n\t"),outputs);
 
 			}catch(Exception e){
 				System.err.println("Error while reading index for document "+ docId+" in query with id "+query.getId()+": "+e.getMessage());
@@ -286,8 +348,8 @@ public class SearchEvalMedline{
 		}
 
 
-		System.out.println("-------------------------");
-		System.out.println("Metrics for query "+query.getId()+"\n");
+		printlnTo("-------------------------",outputs);
+		printlnTo("Metrics for query "+query.getId()+"\n",outputs);
 
 		//Si la query no tiene relevantes, no evaluar métricas
 		if (relevantDocs.size() == 0){
@@ -301,10 +363,10 @@ public class SearchEvalMedline{
 		// double ap = apAux/Math.min(cut,totalHits);
 		double ap = apAux/ (double)relevantDocs.size();
 
-		System.out.println("P@"+cut+": "+precision);
-		System.out.println("Recall@"+cut+": "+recall);
-		System.out.println("AP@"+cut+": "+ap);
-		System.out.println("----------------------------------------\n");
+		printlnTo("P@"+cut+": "+precision,outputs);
+		printlnTo("Recall@"+cut+": "+recall,outputs);
+		printlnTo("AP@"+cut+": "+ap,outputs);
+		printlnTo("----------------------------------------\n",outputs);
 
 		return new QueryMetrics(query,precision, recall, ap);
 	}
