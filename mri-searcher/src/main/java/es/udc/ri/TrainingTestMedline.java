@@ -9,6 +9,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.index.DirectoryReader;
@@ -23,43 +24,83 @@ import org.apache.lucene.search.similarities.LMJelinekMercerSimilarity;
 import org.apache.lucene.search.similarities.Similarity;
 import org.apache.lucene.store.FSDirectory;
 
-class LambdaMetrics {
-	List<QueryMetrics> queryMetrics;
-	double score;
+class TrainingTestMetrics {
+	private List<QueryMetrics> queryMetrics;
 
-	LambdaMetrics(List<QueryMetrics> queryMetrics, double score) {
+	TrainingTestMetrics(List<QueryMetrics> queryMetrics) {
 		this.queryMetrics = queryMetrics;
-		this.score = score;
 	}
 
 	public List<QueryMetrics> getQueryMetrics() {
 		return this.queryMetrics;
 	}
 
-	public double getScore() {
-		return this.score;
+	public double getScore(Metric scoreMetric) {
+		return scoreMetric.getScore(this.queryMetrics);
 	}
+}
+
+enum Metric{
+	P{
+		@Override
+		double getScore(List<QueryMetrics> queryMetrics){
+			return queryMetrics.stream().mapToDouble(metric -> metric.getPrecision()).summaryStatistics()
+				.getAverage();
+		}
+		double getScore(QueryMetrics queryMetrics){
+			return queryMetrics.getPrecision();
+		}
+		
+	},R{
+		@Override
+		double getScore(List<QueryMetrics> queryMetrics){
+			return queryMetrics.stream().mapToDouble(metric -> metric.getRecall()).summaryStatistics()
+				.getAverage();
+		}
+		double getScore(QueryMetrics queryMetrics){
+			return queryMetrics.getRecall();
+		}
+
+	},MAP{
+		@Override
+		double getScore(List<QueryMetrics> queryMetrics){
+			return queryMetrics.stream().mapToDouble(metric -> metric.getAp()).summaryStatistics()
+				.getAverage();
+		}
+		double getScore(QueryMetrics queryMetrics){
+			return queryMetrics.getAp();
+		}
+	};
+
+	abstract double getScore(List<QueryMetrics> queryMetrics);
+	abstract double getScore(QueryMetrics queryMetrics);
+
 }
 
 public class TrainingTestMedline {
 	public static void main(String[] args) {
-		String usage = "java es.udc.ri.SearchEvalMedline"
-				+ " [-indexin INDEX_PATH] [-docs DOCS_PATH]\n"
-				+ " [-search {jm lambda | tfidf}]\n"
-				+ "[-cut n] [-top m] [-search {all | int1 | int1-int2}]";
+		String usage = "java es.udc.ri.TrainingTestMedline"
+				+ " [-{evaljm int1-int2 int3-int4 | evaltfidf int3-int4}s] \n"
+				+ "[-docs DOCS_PATH]\n"
+				+ " [-metrica {P|R|MAP}]\n"
+				+ "[-cut n]\n\n";
 		String indexPath = null;
 		String docsPath = null;
 
-		String queries = null;
-		Integer lowerBound = null;
-		Integer upperBound = null;
+		String trainQueriesString = null;
+		String testQueriesString = null;
 
-		String indexingmodel = null;
-		Float lambda = null;
+		Boolean trainTfidf = null;
 
-		Similarity similarity = null;
+		Integer trainLowerBound = null;
+		Integer trainUpperBound = null;
+
+		Integer testLowerBound = null;
+		Integer testUpperBound = null;
+
+		Metric metric = null;
+
 		Integer cut = null;
-		Integer top = null;
 
 		for (int i = 0; i < args.length; i++) {
 			switch (args[i]) {
@@ -69,19 +110,16 @@ public class TrainingTestMedline {
 				case "-docs":
 					docsPath = args[++i];
 					break;
-				case "-search":
-					indexingmodel = args[++i];
-					if (indexingmodel.contains("jm")) {
-						try {
-							lambda = Float.parseFloat(args[++i]);
-						} catch (Exception e) {
-							throw new IllegalArgumentException("Error while parsing lambda: " + e.getMessage());
-						}
-						similarity = new LMJelinekMercerSimilarity(lambda);
-					} else if (indexingmodel.equals("tfidf")) {
-						similarity = new ClassicSimilarity();
-					} else {
-						throw new IllegalArgumentException("search model not supported: " + indexingmodel);
+				case "-metrica":
+					String argMetrica = args[++i];
+					if (argMetrica.equals("P")){
+						metric = Metric.P;
+					}else if(argMetrica.equals("R")){
+						metric = Metric.R;
+					}else if(argMetrica.equals("MAP")){
+						metric = Metric.MAP;
+					}else{
+						throw new IllegalArgumentException("Unknown metric: " + argMetrica);
 					}
 					break;
 				case "-cut":
@@ -89,39 +127,65 @@ public class TrainingTestMedline {
 					if (cut <= 0)
 						throw new IllegalArgumentException("Cut must be greater than 0");
 					break;
-				case "-top":
-					top = Integer.parseInt(args[++i]);
-					if (top <= 0)
-						throw new IllegalArgumentException("Top must be greater than 0");
-					break;
-				case "-queries":
-					queries = args[++i];
-					if (!queries.equals("all")) {
-						// Si es igual a all, está bien.
-						String[] splitted = queries.split("-");
-						if (splitted.length == 1) {
-							try {
-								lowerBound = Integer.parseInt(splitted[0]);
-								upperBound = lowerBound;
-							} catch (NumberFormatException e) {
-								throw new IllegalArgumentException("Can't parse queries: " + e.getMessage());
+				case "-evaltfidf":
+					trainTfidf =  true;
+					testQueriesString = args[++i];
+					String[] splitted = testQueriesString.split("-");
+					if (splitted.length == 2) {
+						// Si es un rango de queries
+						try {
+							testLowerBound = Integer.parseInt(splitted[0]);
+							testUpperBound = Integer.parseInt(splitted[1]);
+							if (testLowerBound > testUpperBound) {
+								throw new IllegalArgumentException("Queries upper bound must be greater than lower bound");
 							}
-						} else if (splitted.length == 2) {
-							// Si es un rango de queries
-							try {
-								lowerBound = Integer.parseInt(splitted[0]);
-								upperBound = Integer.parseInt(splitted[1]);
-								if (lowerBound > upperBound) {
-									throw new IllegalArgumentException("Queries upper bound must be greater than lower bound");
-								}
-							} catch (NumberFormatException e) {
-								throw new IllegalArgumentException("Can't parse queries: " + e.getMessage());
-							}
-
-						} else {
-							throw new IllegalArgumentException("Invalid query format");
+						} catch (NumberFormatException e) {
+							throw new IllegalArgumentException("Can't parse queries: " + e.getMessage());
 						}
+
+					} else {
+						throw new IllegalArgumentException("Invalid query format");
 					}
+					break;
+
+				case "-evaljm":
+					trainTfidf =  false;
+					trainQueriesString = args[++i];
+					testQueriesString = args[++i];
+
+					String[] trainSplitted = trainQueriesString.split("-");
+					if (trainSplitted.length == 2) {
+						// Si es un rango de queries
+						try {
+							trainLowerBound = Integer.parseInt(trainSplitted[0]);
+							trainUpperBound = Integer.parseInt(trainSplitted[1]);
+							if (trainLowerBound > trainUpperBound) {
+								throw new IllegalArgumentException("Queries upper bound must be greater than lower bound");
+							}
+						} catch (NumberFormatException e) {
+							throw new IllegalArgumentException("Can't parse queries: " + e.getMessage());
+						}
+
+					} else {
+						throw new IllegalArgumentException("Invalid query format");
+					}
+					String[] testSplitted = testQueriesString.split("-");
+					if (testSplitted.length == 2) {
+						// Si es un rango de queries
+						try {
+							testLowerBound = Integer.parseInt(testSplitted[0]);
+							testUpperBound = Integer.parseInt(testSplitted[1]);
+							if (testLowerBound > testUpperBound) {
+								throw new IllegalArgumentException("Queries upper bound must be greater than lower bound");
+							}
+						} catch (NumberFormatException e) {
+							throw new IllegalArgumentException("Can't parse queries: " + e.getMessage());
+						}
+
+					} else {
+						throw new IllegalArgumentException("Invalid query format");
+					}
+
 					break;
 
 				default:
@@ -130,7 +194,7 @@ public class TrainingTestMedline {
 			}
 		}
 
-		if (indexPath == null || top == null || similarity == null || cut == null || docsPath == null || queries == null) {
+		if (indexPath == null || docsPath ==null ||  cut == null ||  metric == null || trainTfidf==null||testLowerBound == null || testLowerBound ==null) {
 			System.err.println("Usage: " + usage);
 			System.exit(1);
 		}
@@ -155,12 +219,24 @@ public class TrainingTestMedline {
 		List<MedlineInfo> queriesInfo = MedlineInfo.parseMedline(queryReader);
 		HashMap<Long, List<Long>> relevances = MedlineInfo.getRelevance(relevanceReader);
 
-		if (lowerBound != null && upperBound != null) {
-			// Hay que declararlas finale sino da error con el removeIf
-			final int lower = lowerBound;
-			final int upper = upperBound;
-			queriesInfo.removeIf(query -> query.getId() < lower || query.getId() > upper);
+
+		// Tienen que ser final para poder usarlos en los closures...
+		
+		final int finalTestLowerBound = testLowerBound;
+		final int finalTestUpperBound = testUpperBound;
+
+		List<MedlineInfo> trainQueries = null;
+		if(!trainTfidf){
+			final int finalTrainLowerBound = trainLowerBound;
+			final int finalTrainUpperBound = trainUpperBound;
+			trainQueries = queriesInfo.stream()
+			.filter(query -> query.getId() >= finalTrainLowerBound && query.getId() <= finalTrainUpperBound).collect(Collectors.toList());
+
 		}
+		
+		List<MedlineInfo> testQueries = queriesInfo.stream()
+			.filter(query -> query.getId() >= finalTestLowerBound && query.getId() <= finalTestUpperBound).collect(Collectors.toList());
+
 
 		// Empezamos a leer el índice
 
@@ -176,103 +252,163 @@ public class TrainingTestMedline {
 			System.exit(1);
 		}
 
-		searcher = new IndexSearcher(reader);
-		searcher.setSimilarity(similarity);
+		
 		parser = new QueryParser("Contents", new StandardAnalyzer());
+		searcher = new IndexSearcher(reader);
 
-		String outputFile = null;
-		String csvFile = null;
+		List<TrainingTestMetrics> trainMetrics=null;
+		Float bestLambda =null;
+		if(!trainTfidf){
+			float step = 0.1f;
+			trainMetrics = new ArrayList<>();
+			// No se puede poner lambda=0...
+			for (int i = 1; i <= 10; i++) {
+				searcher.setSimilarity(new LMJelinekMercerSimilarity(i*step));
+				trainMetrics.add(processQueries(reader, searcher, parser, trainQueries, relevances, cut));
+			}
+	
+			double maxScore = trainMetrics.get(0).getScore(metric);
+			int maxIndex = 0;
+			for (int i = 0; i < trainMetrics.size(); i++){
+				double newScore = trainMetrics.get(i).getScore(metric);
+				if ( newScore > maxScore){
+					maxScore = newScore;
+					maxIndex = i;
+				}
+			}
+	
+			bestLambda = step*(maxIndex+1);
+			searcher.setSimilarity(new LMJelinekMercerSimilarity(bestLambda));
+		}else{
+			searcher.setSimilarity(new ClassicSimilarity());
+		}
+		
 
-		if (indexingmodel.equals("tfidf")) {
-			outputFile = "medline.tfidf." + top + ".hits.q" + queries + ".txt";
-			csvFile = "medline.tfidf." + cut + ".cut.q" + queries + ".csv";
+		TrainingTestMetrics testMetrics = processQueries(reader, searcher, parser, testQueries, relevances, cut);
 
-		} else if (indexingmodel.equals("jm")) {
-			outputFile = "medline.jm." + top + ".hits.lambda." +
-					lambda + ".q" + queries + ".txt";
 
-			csvFile = "medline.jm." + cut + ".cut.lambda." +
-					lambda + ".q" + queries + ".csv";
+		String trainFile = null;
+		String testFile = null;
+
+		if (trainTfidf) {
+			testFile = String.format("medline.tfidf.training.null.test.%d-%d.%s%d.test.csv",
+				testLowerBound,testUpperBound,metric.toString().toLowerCase(),cut);
 		} else {
-			System.err.println("Indexing model not supported: " + indexingmodel);
+			trainFile = String.format("medline.jm.training.%d-%d.test.%d-%d.%s%d.training.csv",
+				trainLowerBound,trainUpperBound,testLowerBound,testUpperBound,
+				metric.toString().toLowerCase(),cut);
+
+			testFile = String.format("medline.jm.training.%d-%d.test.%d-%d.%s%d.test.csv",
+				trainLowerBound,trainUpperBound,testLowerBound,testUpperBound,
+				metric.toString().toLowerCase(),cut);
 		}
 
-		PrintWriter outputFileWriter = null;
-		PrintWriter csvFileWriter = null;
+		if(!trainTfidf){
+			writeTrainingCsv(trainFile,trainMetrics,metric,cut);
+		}
+		writeTestCsv(testFile,bestLambda,testMetrics,metric,cut);
+
+		// TODO: Volcar el contenido del csv por pantalla
+
+	
+
+	}
+	public static void writeTrainingCsv(String fileName,List<TrainingTestMetrics> trainingMetrics,Metric metric,int cut){
+		PrintWriter fileWriter = null;
 
 		try {
-			FileWriter fw = new FileWriter(outputFile, false);
+			FileWriter fw = new FileWriter(fileName, false);
 			BufferedWriter bw = new BufferedWriter(fw);
-			outputFileWriter = new PrintWriter(bw);
+			fileWriter = new PrintWriter(bw);
 
-			FileWriter csvFw = new FileWriter(csvFile, false);
-			BufferedWriter csvBw = new BufferedWriter(csvFw);
-			csvFileWriter = new PrintWriter(csvBw);
+
 		} catch (Exception e) {
 			System.err.println("Error while creating writer: " + e.getMessage());
 			System.exit(1);
 		}
+		fileWriter.print(metric+"@" + cut);
+		double step = 0.1f;
+		for (int i =1;i<=10;i++){
+			fileWriter.printf(",%.1f",step*i);
+		}
 
-		PrintWriter[] outputs = new PrintWriter[] { outputFileWriter, new PrintWriter(System.out) };
+		int numQueries = trainingMetrics.get(0).getQueryMetrics().size();
+		for( int i=0;i<numQueries; i++){
 
+			List<QueryMetrics> queryMetrics = trainingMetrics.get(0).getQueryMetrics();
+			MedlineInfo targetQuery = queryMetrics.get(i).getQuery();
+
+			fileWriter.print(targetQuery.getId());
+			for (TrainingTestMetrics lambdaTrainingMetrics : trainingMetrics){
+
+				double lambdaScore = metric.getScore(lambdaTrainingMetrics.getQueryMetrics().get(i));
+				fileWriter.printf(",%.5f",lambdaScore);
+			}
+			fileWriter.println();
+		}
+		fileWriter.print("mean");
+		for(TrainingTestMetrics lambdaTrainingMetrics : trainingMetrics){
+			fileWriter.printf(",%.5f",lambdaTrainingMetrics.getScore(metric));
+		}
+
+		fileWriter.close();
+	}
+
+	public static void writeTestCsv(String fileName,Float bestLambda, TrainingTestMetrics testMetrics,Metric metric,int cut){
+		PrintWriter fileWriter = null;
+
+		try {
+			FileWriter fw = new FileWriter(fileName, false);
+			BufferedWriter bw = new BufferedWriter(fw);
+			fileWriter = new PrintWriter(bw);
+
+
+		} catch (Exception e) {
+			System.err.println("Error while creating writer: " + e.getMessage());
+			System.exit(1);
+		}
+		
+		if (bestLambda == null){
+			fileWriter.print("null");
+		}else{
+			fileWriter.printf("%.1f",bestLambda);
+		}
+		fileWriter.printf(",%s@%d\n",metric,cut);
+
+
+		for(QueryMetrics queryMetrics : testMetrics.getQueryMetrics()){
+
+			MedlineInfo targetQuery = queryMetrics.getQuery();
+
+			fileWriter.print(targetQuery.getId()+",");
+			fileWriter.printf("%.5f\n",metric.getScore(queryMetrics));
+		}
+		fileWriter.print("mean");
+		fileWriter.printf(",%.5f",testMetrics.getScore(metric));
+
+		fileWriter.close();
+	}
+
+	public static TrainingTestMetrics processQueries(IndexReader reader, IndexSearcher searcher,
+		QueryParser parser, List<MedlineInfo> queries, HashMap<Long,List<Long>> relevances, int cut){
+			
 		List<QueryMetrics> metrics = new ArrayList<>();
-		for (MedlineInfo query : queriesInfo) {
+		for (MedlineInfo query : queries) {
 			List<Long> relevantDocs = relevances.get(query.getId());
-			QueryMetrics queryMetrics = processQuery(outputs, reader, searcher, parser, query, relevantDocs, top, cut);
+			QueryMetrics queryMetrics = processQuery( reader, searcher, parser, query, relevantDocs, cut);
 			// Si se ha podido computar los query metrics
 			if (queryMetrics != null) {
 				metrics.add(queryMetrics);
 			}
 		}
-
-		double meanPrecision = metrics.stream().mapToDouble(metric -> metric.getPrecision()).summaryStatistics()
-				.getAverage();
-		double meanRecall = metrics.stream().mapToDouble(metric -> metric.getRecall()).summaryStatistics().getAverage();
-		double meanAp = metrics.stream().mapToDouble(metric -> metric.getAp()).summaryStatistics().getAverage();
-		printlnTo("----------------------------------------\n", outputs);
-		String message;
-		if (queries.equals("all")) {
-			message = "all queries";
-		} else if (queries.contains("-")) {
-			message = "queries " + queries;
-		} else {
-			message = "query " + queries;
-		}
-		printlnTo("Summary for " + message + ":", outputs);
-		printlnTo("Mean P@" + cut + ": " + meanPrecision, outputs);
-		printlnTo("Mean Recall@" + cut + ": " + meanRecall, outputs);
-		printlnTo("MAP@" + cut + ": " + meanAp, outputs);
-
-		// Create csv
-
-		csvFileWriter.println("query,P@" + cut + ",Recall@" + cut + ",AP@" + cut);
-		for (QueryMetrics metric : metrics) {
-			csvFileWriter.println(metric.getQuery().getId() + "," + metric.getPrecision() + "," +
-					metric.getRecall() + "," + metric.getAp());
-		}
-		csvFileWriter.println("mean," + meanPrecision + "," + meanRecall + "," + meanAp);
-
-		outputFileWriter.close();
-		csvFileWriter.close();
+		return new TrainingTestMetrics(metrics);
 	}
 
-	private static void printTo(String content, PrintWriter[] outputs) {
-		for (PrintWriter output : outputs) {
-			output.print(content);
-			output.flush();
-		}
-	}
-
-	private static void printlnTo(String content, PrintWriter[] outputs) {
-		printTo(content + "\n", outputs);
-	}
-
-	public static QueryMetrics processQuery(PrintWriter[] outputs, IndexReader reader, IndexSearcher searcher,
-			QueryParser parser, MedlineInfo query, List<Long> relevantDocs, int top, int cut) {
+	public static QueryMetrics processQuery(IndexReader reader, IndexSearcher searcher,
+			QueryParser parser, MedlineInfo query, List<Long> relevantDocs, int cut) {
 
 		// Pasar a minúsculas y eliminar paréntesis
 		String queryContents = query.getContents().toLowerCase().replace("(", "").replace(")", "");
-		int numDocs = Math.max(top, cut);
 		Query parsedQuery = null;
 		try {
 			// Preguntar si quitar paréntesis. Da problemas con paréntesis no cerrados
@@ -283,7 +419,7 @@ public class TrainingTestMedline {
 		}
 		TopDocs topdocs = null;
 		try {
-			topdocs = searcher.search(parsedQuery, numDocs);
+			topdocs = searcher.search(parsedQuery, cut);
 		} catch (Exception e) {
 			System.err.println("Could not get top docs from query with id " + query.getId() + ": " + e.getMessage());
 			return null;
@@ -294,31 +430,14 @@ public class TrainingTestMedline {
 		int VP = 0;
 		double apAux = 0;
 
-		printlnTo("-------------------------", outputs);
-		printlnTo("Ranking for query " + query.getId() + ": " + queryContents + "", outputs);
 
-		printTo(String.format("%-37s\n", "-".repeat(37)), outputs);
-
-		printTo(String.format("|%-4s | ", "Rank"), outputs);
-		printTo(String.format("%-9s | ", "MedlineID"), outputs);
-		printTo(String.format("%-9s | ", "Score"), outputs);
-		printTo(String.format("%-4s|\n", "Rel"), outputs);
-		printTo(String.format("%-37s\n", "-".repeat(37)), outputs);
-
-		for (int i = 0; i < Math.min(totalHits, numDocs); i++) {
+		for (int i = 0; i < Math.min(totalHits, cut); i++) {
 			int docId = scoreDocs[i].doc;
 			try {
 				long medlineId = Long.parseLong(reader.document(docId).get("DocIDMedline"));
 				boolean relevant = relevantDocs.contains(medlineId);
 
-				if (i < top) {
-					printTo(String.format("|%-4d | ", i + 1), outputs);
-					printTo(String.format("%-9d | ", medlineId), outputs);
-					printTo(String.format("%-9.6f | ", scoreDocs[i].score), outputs);
-					printTo(String.format("%-4s|\n", relevant ? " R" : ""), outputs);
-				}
-
-				if (relevant && i < cut) {
+				if (relevant) {
 					VP++;
 					apAux += (double) VP / (double) (i + 1);
 				}
@@ -328,32 +447,13 @@ public class TrainingTestMedline {
 				continue;
 			}
 		}
-		printTo(String.format("%-37s\n", "-".repeat(37)), outputs);
-
-		for (int i = 0; i < Math.min(top, totalHits); i++) {
-			ScoreDoc doc = scoreDocs[i];
-			int docId = doc.doc;
-			try {
-				long medlineId = Long.parseLong(reader.document(docId).get("DocIDMedline"));
-				String medlineContents = reader.document(docId).get("Contents");
-				printlnTo("Contents for document " + medlineId + ":", outputs);
-				printlnTo("\t" + medlineContents.replace("\n", "\n\t"), outputs);
-
-			} catch (Exception e) {
-				System.err.println("Error while reading index for document " + docId + " in query with id " + query.getId()
-						+ ": " + e.getMessage());
-				continue;
-			}
-		}
-
-		printlnTo("-------------------------", outputs);
-		printlnTo("Metrics for query " + query.getId() + "\n", outputs);
-
 		// Si la query no tiene relevantes, no evaluar métricas
 		if (relevantDocs.size() == 0) {
 			System.err.println("Query " + query.getId() + " does not have any relevant document. Can't compute metrics.");
 			return null;
 		}
+
+
 		double precision = (double) VP / (double) Math.min(cut, totalHits);
 		double recall = (double) VP / (double) relevantDocs.size();
 		// Esta métrica así sería parecida al precision, pero penalizando más a los
@@ -361,12 +461,6 @@ public class TrainingTestMedline {
 		// que tienen otros no relevantes encima. No sé si estaría bien usarla tambien
 		// double ap = apAux/Math.min(cut,totalHits);
 		double ap = apAux / (double) relevantDocs.size();
-
-		printlnTo("P@" + cut + ": " + precision, outputs);
-		printlnTo("Recall@" + cut + ": " + recall, outputs);
-		printlnTo("AP@" + cut + ": " + ap, outputs);
-		printlnTo("----------------------------------------\n", outputs);
-
 		return new QueryMetrics(query, precision, recall, ap);
 	}
 }
