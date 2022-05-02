@@ -19,7 +19,7 @@ public class Compare {
 
 		String results1 = null;
 		String results2 = null;
-		Double alpha=null;
+		Double alpha = null;
 		Boolean t_test = null;
 
 		for (int i = 0; i < args.length; i++) {
@@ -32,11 +32,10 @@ public class Compare {
 				case "-test":
 					String testString = args[++i];
 
-
 					if (testString.contains("wilcoxon")) {
-						t_test  = false;
+						t_test = false;
 					} else if (testString.equals("t")) {
-						t_test  = true;
+						t_test = true;
 					} else {
 						throw new IllegalArgumentException("Test not supported: " + testString);
 					}
@@ -47,7 +46,7 @@ public class Compare {
 						throw new IllegalArgumentException("Error while parsing alpha: " + e.getMessage());
 					}
 					break;
-				
+
 				default:
 					System.err.println("Usage: " + usage);
 					throw new IllegalArgumentException("unknown parameter " + args[i]);
@@ -67,27 +66,26 @@ public class Compare {
 		String testResults2 = splittedResults2[5];
 		String metricResults2 = splittedResults2[6];
 
-		if(!testResults1.equals(testResults2)){
-			System.err.println("Test queries does not match: " + testResults1+" and " + testResults2);
+		if (!testResults1.equals(testResults2)) {
+			System.err.println("Test queries does not match: " + testResults1 + " and " + testResults2);
 			System.exit(1);
 		}
 
-		if(!metricResults1.equals(metricResults2)) {
-			System.err.println("Test metrics does not match: " + metricResults1+" and " + metricResults2);
+		if (!metricResults1.equals(metricResults2)) {
+			System.err.println("Test metrics does not match: " + metricResults1 + " and " + metricResults2);
 			System.exit(1);
 		}
-
 
 		double[] x = parseCsv(results1);
 		double[] y = parseCsv(results2);
 
 		double p_value;
-		if (t_test) 
+		if (t_test)
 			p_value = new TTest().pairedTTest(x, y);
 		else
 			p_value = new WilcoxonSignedRankTest().wilcoxonSignedRankTest(x, y, true);
 
-		if (p_value<alpha) {
+		if (p_value < alpha) {
 			System.out.println("Se rechaza la hipótesis nula (Hay uno mejor que el otro)");
 			System.out.println("p-value = " + p_value + " < " + alpha);
 		} else {
@@ -96,25 +94,25 @@ public class Compare {
 		}
 	}
 
-	public static double[] parseCsv(String path){
+	public static double[] parseCsv(String path) {
 		List<Double> metricValues = new ArrayList<>();
 		try (FileReader reader = new FileReader(path);
-			BufferedReader bufferedReader = new BufferedReader(reader)){
+				BufferedReader bufferedReader = new BufferedReader(reader)) {
 
-			bufferedReader.lines().skip(1).forEachOrdered(line->{
+			bufferedReader.lines().skip(1).forEachOrdered(line -> {
 				String valueString = line.split(",")[1];
-				 metricValues.add(Double.parseDouble(valueString));
+				metricValues.add(Double.parseDouble(valueString));
 			});
 		} catch (FileNotFoundException e) {
 			System.err.println("File not found: " + path);
 			System.exit(1);
-		} catch(Exception e){
+		} catch (Exception e) {
 			System.err.println("Could not read file: " + path);
 			System.exit(1);
 		}
-		// Hasta size-1 para no meter en el array la media 
-		double[] array = new double[metricValues.size()-1];
-		for(int i = 0; i < metricValues.size()-1;i++){
+		// Hasta size-1 para no meter en el array la media
+		double[] array = new double[metricValues.size() - 1];
+		for (int i = 0; i < metricValues.size() - 1; i++) {
 			array[i] = metricValues.get(i);
 		}
 		return array;
