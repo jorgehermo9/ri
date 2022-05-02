@@ -1,5 +1,6 @@
 package es.udc.ri;
 
+import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
@@ -305,12 +306,12 @@ public class TrainingTestMedline {
 
 		if(!trainTfidf){
 			writeTrainingCsv(trainFile,trainMetrics,metric,cut);
+			System.out.println("Training results");
+			printFile(trainFile);
 		}
 		writeTestCsv(testFile,bestLambda,testMetrics,metric,cut);
-
-		// TODO: Volcar el contenido del csv por pantalla
-
-	
+		System.out.println("Test results");
+		printFile(testFile);
 
 	}
 	public static void writeTrainingCsv(String fileName,List<TrainingTestMetrics> trainingMetrics,Metric metric,int cut){
@@ -331,6 +332,7 @@ public class TrainingTestMedline {
 		for (int i =1;i<=10;i++){
 			fileWriter.printf(",%.1f",step*i);
 		}
+		fileWriter.println();
 
 		int numQueries = trainingMetrics.get(0).getQueryMetrics().size();
 		for( int i=0;i<numQueries; i++){
@@ -389,6 +391,23 @@ public class TrainingTestMedline {
 		fileWriter.close();
 	}
 
+	public static void printFile(String path){
+		System.out.println("-----------------------");
+		System.out.println("Showing contents for: "+path+"\n");
+		try (FileReader reader = new FileReader(path);
+			BufferedReader bufferedReader = new BufferedReader(reader)){
+
+			bufferedReader.lines().forEachOrdered(line->System.out.println(line));
+			System.out.println("-----------------------");
+
+		} catch (FileNotFoundException e) {
+			System.err.println("File not found: " + path);
+			return;
+		} catch(Exception e){
+			System.err.println("Could not read file: " + path);
+			return;
+		}
+	}
 	public static TrainingTestMetrics processQueries(IndexReader reader, IndexSearcher searcher,
 		QueryParser parser, List<MedlineInfo> queries, HashMap<Long,List<Long>> relevances, int cut){
 			
