@@ -84,10 +84,10 @@ public class Compare {
 			p_value = new WilcoxonSignedRankTest().wilcoxonSignedRankTest(x, y, true);
 
 		if (p_value < alpha) {
-			System.out.println("Se rechaza la hipótesis nula (Hay uno mejor que el otro)");
+			System.out.println("Se rechaza la hipótesis nula");
 			System.out.println("p-value = " + p_value + " < " + alpha);
 		} else {
-			System.out.println("No se rechaza hipótesis nula (No hay pruebas de que uno sea mejor que el otro)");
+			System.out.println("No se rechaza hipótesis nula");
 			System.out.println("p-value = " + p_value + " >= " + alpha);
 		}
 	}
